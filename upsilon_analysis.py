@@ -265,36 +265,31 @@ def book_histograms(df, args):
     return y_bins
 
 
-CrystallBallParameters = collections.namedtuple("CrystallBallParameters",
-                                                "a m sigma alpha n")
+GausParameters = collections.namedtuple("GausParameters", "a m sigma")
 LineParameters = collections.namedtuple("LineParameters", "q m")
 FitResults = collections.namedtuple("FitResults", "y1 y2 y3 bkg chi2 ndf")
 
 
-def get_cb_parameters(cb):
-    """Gets a `CrystallBallParameters` named tuple from a TF1.
+def get_ga_parameters(ga, bin_width):
+    """Gets a `GausParameters` named tuple from a TF1.
 
-    This function is necessary because a `TF1` using `crystalball(n)` is
-    used for fitting, but that function is not normalized. If the number
+    This function is necessary because a `TF1` using `gaus(n)` is used
+    for fitting, but that function is not normalized. If the number
     of resonances occurred is what we need the normalization factor must
     be taken into account.
+
+    Also, the bin width needs to be taken into account since the fit
+    uses the value of the function at the center of the bin, rather than
+    its integral as this produces a non-negligible speedup.
     """
     # TODO take into account bin width
-    p0 = cb.GetParameter(0)
-    cb.SetParameter(0, 1)
-    return CrystallBallParameters(p0 / cb.Integral(8.5, 11.5),
-                                  cb.GetParameter(1), cb.GetParameter(2),
-                                  cb.GetParameter(3), cb.GetParameter(4))
-
-
-def auto_rebin(histo):
-    """Automatically rebins a TH1 if there are too few entries."""
-    # Using Sturge's rule of thumb
-    ideal_nbins = 1 + 3.322 * math.log10(histo.GetEntries())
-    current_nbins = histo.GetNbinsX()
-    rebin = int(current_nbins / ideal_nbins / 2.5)
-    logging.debug("Rebinning TH1 '%s' by factor %d", histo.GetTitle(), rebin)
-    histo.Rebin(rebin)
+    p0 = ga.GetParameter(0)
+    ga.SetParameter(0, 1)
+    int = ga.Integral(8.5, 11.5)
+    try:
+        return GausParameters(p0 / int, ga.GetParameter(1), ga.GetParameter(2))
+    except ZeroDivisionError:
+        return GausParameters(math.nan, ga.GetParameter(1), ga.GetParameter(2))
 
 
 def fit_histograms(histos, args):
@@ -303,18 +298,17 @@ def fit_histograms(histos, args):
     the plots to "mass_histos.pdf" and returns the results of the fits
     in a dictionary of dictionaries similar to `histos`.
 
-    The fit function used is the sum of three Crystal Ball functions
-    for the resonances plus a linear parametrization for the background.
+    The fit function used is the sum of three Gaussian functions for the
+    resonances plus a linear parametrization for the background.
 
     The results of each fit are returned as a `FitResults` named tuple,
     which has six fields:
-     - `y1`, `y2` and `y3` are `CrystallBallParameters` named tuples,
-       whose fields are:
+     - `y1`, `y2` and `y3` are `GausParameters` named tuples, whose
+       fields are:
         - `a` the factor multiplying the normalized distribution, a.k.a.
           number of occurrences of the resonance;
         - `m` the mean of the resonance, a.k.a. pole mass;
         - `sigma` the resonance width parameter;
-        - `alpha`, `n` the parameters of the Crystall Ball's tail;
      - `bkg` is a `LineParameters` named tuple, whose parameters are:
         - `q` the vertical intercept of the line;
         - `m` the slope of the line;
@@ -326,40 +320,27 @@ def fit_histograms(histos, args):
     """
     logging.debug("Fitting histograms")
     # Fit function
-    ff = ROOT.TF1("ff", "crystalball(0)+crystalball(5)+crystalball(10)"
-                  "+pol1(15)", 8.5, 11.5)
-    ff.SetParLimits(1, 9.44, 9.48)  # m1
-    ff.SetParLimits(2, 0.01, 0.1)   # sigma1
-    ff.SetParLimits(3, 0.01, 10)    # alpha1
-    ff.SetParLimits(4, 1, 50)       # n1
-    ff.SetParLimits(6, 10, 10.05)
-    ff.SetParLimits(7, 0.01, 0.1)
-    ff.SetParLimits(8, 0.01, 10)
-    ff.SetParLimits(9, 0.01, 10)
-    ff.SetParLimits(11, 10.33, 10.38)
-    ff.SetParLimits(12, 0.01, 0.1)
-    ff.SetParLimits(13, 0.01, 10)
-    ff.SetParLimits(14, 0.01, 10)
+    ff = ROOT.TF1("ff", "gaus(0)+gaus(3)+gaus(6)+pol1(9)", 8.5, 11.5)
     # Partial functions for plotting
-    cb1 = ROOT.TF1("cb1", "crystalball(0)", 8.5, 11.5)
-    cb2 = ROOT.TF1("cb2", "crystalball(0)", 8.5, 11.5)
-    cb3 = ROOT.TF1("cb3", "crystalball(0)", 8.5, 11.5)
+    ga1 = ROOT.TF1("ga1", "gaus(0)", 8.5, 11.5)
+    ga2 = ROOT.TF1("ga2", "gaus(0)", 8.5, 11.5)
+    ga3 = ROOT.TF1("ga3", "gaus(0)", 8.5, 11.5)
     bkg = ROOT.TF1("bkg", "pol1(0)", 8.5, 11.5)
 
     results = {}
     canvas = ROOT.TCanvas("", "", 640, 480)
     ROOT.gStyle.SetOptStat(10)
     ROOT.gStyle.SetOptFit(100)
-    ROOT.gStyle.SetStatX()  # Reset stat box size and position
-    ROOT.gStyle.SetStatY()
-    ROOT.gStyle.SetStatH()
-    ROOT.gStyle.SetStatW()
+    ROOT.gStyle.SetStatX(0.91)
+    ROOT.gStyle.SetStatY(0.91)
+    ROOT.gStyle.SetStatH(0.05)
+    ROOT.gStyle.SetStatW(0.15)
     out_pdf = os.path.join(args.output_dir, "mass_histos.pdf")
     canvas.Print(f"{out_pdf}[")  # Open PDF to plot multiple pages
     ff.SetLineColor(ROOT.kBlack)
-    cb1.SetLineColor(ROOT.kRed)
-    cb2.SetLineColor(ROOT.kGreen + 3)
-    cb3.SetLineColor(ROOT.kMagenta + 2)
+    ga1.SetLineColor(ROOT.kRed)
+    ga2.SetLineColor(ROOT.kGreen + 3)
+    ga3.SetLineColor(ROOT.kMagenta + 2)
     bkg.SetLineColor(ROOT.kBlue)
 
     for (y_low, y_high), pt_bins in histos.items():
@@ -368,26 +349,29 @@ def fit_histograms(histos, args):
             histo.SetTitle(f"{y_low}<|y|<{y_high}, "
                            f"{pt_low}<p_{{T}}<{pt_high} GeV/c")
             histo.Draw("E")
-            # auto_rebin(histo)
-            a = histo.GetMaximum()  # For initial parameters
-            ff.SetParameters(array.array('d', [a, 9.460, 0.1, 1, 10,
-                                               0.5 * a, 10.023, 0.1, 1, 1,
-                                               0.35 * a, 10.355, 0.1, 1, 1,
-                                               850 + 0.1 * a, -100]))
+            # Initial parameters
+            a = histo.GetMaximum()
+            b = histo.GetBinContent(1)
+            a -= b
+            ff.SetParameters(a, 9.46, 0.1,
+                             0.5 * a, 10.023, 0.1,
+                             0.35 * a, 10.355, 0.1,
+                             b, 0)
             histo.Fit(ff, "QB")  # Use default migrad algorithm
-            cb1.SetParameters(*(ff.GetParameter(i) for i in range(5)))
-            cb2.SetParameters(*(ff.GetParameter(i) for i in range(5, 10)))
-            cb3.SetParameters(*(ff.GetParameter(i) for i in range(10, 15)))
-            bkg.SetParameters(ff.GetParameter(15), ff.GetParameter(16))
-            cb1.Draw("L SAME")
-            cb2.Draw("L SAME")
-            cb3.Draw("L SAME")
+            ga1.SetParameters(*(ff.GetParameter(i) for i in range(3)))
+            ga2.SetParameters(*(ff.GetParameter(i) for i in range(3, 6)))
+            ga3.SetParameters(*(ff.GetParameter(i) for i in range(6, 9)))
+            bkg.SetParameters(ff.GetParameter(9), ff.GetParameter(10))
+            ga1.Draw("L SAME")
+            ga2.Draw("L SAME")
+            ga3.Draw("L SAME")
             bkg.Draw("L SAME")
             canvas.Print(out_pdf, f"Title:{y_low}<|y|<{y_high}, "
                          f"{pt_low}<pt<{pt_high}")
             pt_results[(pt_low, pt_high)] = FitResults(
-                get_cb_parameters(cb1), get_cb_parameters(cb2),
-                get_cb_parameters(cb3),
+                get_ga_parameters(ga1, histo.GetBinWidth(1)),
+                get_ga_parameters(ga2, histo.GetBinWidth(1)),
+                get_ga_parameters(ga3, histo.GetBinWidth(1)),
                 LineParameters(bkg.GetParameter(0), bkg.GetParameter(1)),
                 ff.GetChisquare(), ff.GetNDF()
             )
@@ -412,6 +396,8 @@ if __name__ == "__main__":
         logging.debug("Creating output directory %s", args.output_dir)
         os.mkdir(output_dir)
     fits = fit_histograms(mass_histos, args)
+    # TODO log fit results if verbose (use logging.info)
+    # TODO take into account failing fits when peaks are too small
     # TODO check that, with different rebinning, the results don't change !!!
     # TODO remember to keep into account that the fit function returns the
     # number of occurrences of resonances N, but we need N/ΔptΔy

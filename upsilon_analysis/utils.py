@@ -115,7 +115,7 @@ LineParameters = collections.namedtuple("LineParameters", "q m")
 FitResults = collections.namedtuple("FitResults", "y1 y2 y3 bkg chi2 ndf")
 
 
-def get_gaus_parameters(ga, bin_width, range=(8.5, 11.5)):
+def get_gaus_parameters(ga, bin_width, hist_range=(8.5, 11.5)):
     """Gets a ``GausParameters`` named tuple from a ``TF1``.
 
     This function takes a ``TF1`` defined by the formula "gaus(0)" as
@@ -134,8 +134,11 @@ def get_gaus_parameters(ga, bin_width, range=(8.5, 11.5)):
     Note that this also works if the fit option "I" (using the integral
     of the function in the bin rather than its value at the center) is
     used, since ROOT normalizes histogram integrals to the bin width.
+
+    Do not forget to provide the range if the default ``hist_range`` is
+    not correct.
     """
-    p0 = ga.Integral(*range) / bin_width
+    p0 = ga.Integral(*hist_range) / bin_width
     return GausParameters(p0, ga.GetParameter(1), ga.GetParameter(2))
 
 
@@ -150,8 +153,11 @@ def print_fit_results(results, file=None):
             print(",".join(str(x) for x in cols), file=file)
 
 
-class Namespace(object):
-    """A class for holding options similar to ``argparse.Namespace``."""
+class Namespace:
+    """A class for holding options similar to ``argparse.Namespace``.
+
+    ``kwargs`` is used to set the initial attributes of the object.
+    """
     def __init__(self, **kwargs):
         self.update(kwargs)
 
@@ -168,6 +174,7 @@ class Namespace(object):
     def _get_kwargs(self):
         return sorted(self.__dict__.items())
 
-    def update(self, dict):
-        for name, value in dict.items():
+    def update(self, dictionary):
+        """Same as the constuctor, but takes a dictionary."""
+        for name, value in dictionary.items():
             setattr(self, name, value)

@@ -36,7 +36,7 @@ if __name__ == "__main__":
 
     if not os.path.isdir(args.output_dir):
         logging.info("Creating output directory %s", args.output_dir)
-        os.mkdir(output_dir)
+        os.mkdir(args.output_dir)
     fits = fit_histograms(mass_histos, args)
     # Save fit results to a CSV file, for importing use TTree::ReadFile
     out_csv = os.path.join(args.output_dir, "fit_results.csv")

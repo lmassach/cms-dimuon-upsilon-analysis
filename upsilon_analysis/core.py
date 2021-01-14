@@ -17,11 +17,9 @@
 """Core functions for the upsilon analysis."""
 import argparse
 import os
-import itertools
-import math
 import logging
 import ROOT
-from .utils import *
+from . import utils
 
 __all__ = ["parse_args", "make_args", "build_dataframe", "book_histograms",
            "fit_histograms"]
@@ -83,12 +81,12 @@ def make_args(**kwargs):
     allows to use a more Pythonic syntax to pass options to the core
     functions.
     """
-    ns = Namespace(**vars(parse_args([])))
+    ns = utils.Namespace(**vars(parse_args([])))
     ns.update(kwargs)
     return ns
 
 
-@static_variables(c_functions_defined=False)
+@utils.static_variables(c_functions_defined=False)
 def build_dataframe(args):
     """
     Makes a ``ROOT.RDataFrame`` with the given input, applies cuts
@@ -205,14 +203,14 @@ def book_histograms(df, args):
     histo_model = ("dimuon_mass",
                    "m_{#mu#mu};m_{#mu#mu} [GeV/c^{2}];Occurrences / bin",
                    args.mass_bins, 8.5, 11.5)
-    edges = y_bin_edges(args.y_min, args.y_max, args.y_bins)
-    y_bins = {bin: {} for bin in bins(edges)}
+    edges = utils.y_bin_edges(args.y_min, args.y_max, args.y_bins)
+    y_bins = {bin: {} for bin in utils.bins(edges)}
     y_bins[(args.y_min, args.y_max)] = {}  # Bin with all rapidities
     for (y_low, y_high), pt_bins in y_bins.items():
         y_filtered = df.Filter(f"{y_low}<=abs(dimuon_y)&&"
                                f"abs(dimuon_y)<{y_high}")
-        edges = pt_bin_edges(args.pt_min, args.pt_max, args.pt_bin_width)
-        for pt_low, pt_high in bins(edges):
+        edges = utils.pt_bin_edges(args.pt_min, args.pt_max, args.pt_bin_width)
+        for pt_low, pt_high in utils.bins(edges):
             pt_filtered = y_filtered.Filter(f"{pt_low}<dimuon_pt&&"
                                             f"dimuon_pt<{pt_high}")
             pt_bins[(pt_low, pt_high)] = pt_filtered.Histo1D(histo_model,
@@ -309,11 +307,11 @@ def fit_histograms(histos, args):
             canvas.SetGrid()
             canvas.Print(out_pdf, f"Title:y ({y_low:g},{y_high:g}), "
                          f"pt ({pt_low:g},{pt_high:g})")
-            pt_results[(pt_low, pt_high)] = FitResults(
-                get_gaus_parameters(ga1, histo.GetBinWidth(1)),
-                get_gaus_parameters(ga2, histo.GetBinWidth(1)),
-                get_gaus_parameters(ga3, histo.GetBinWidth(1)),
-                LineParameters(bkg.GetParameter(0), bkg.GetParameter(1)),
+            pt_results[(pt_low, pt_high)] = utils.FitResults(
+                utils.get_gaus_parameters(ga1, histo.GetBinWidth(1)),
+                utils.get_gaus_parameters(ga2, histo.GetBinWidth(1)),
+                utils.get_gaus_parameters(ga3, histo.GetBinWidth(1)),
+                utils.LineParameters(bkg.GetParameter(0), bkg.GetParameter(1)),
                 ff.GetChisquare(), ff.GetNDF()
             )
         results[(y_low, y_high)] = pt_results

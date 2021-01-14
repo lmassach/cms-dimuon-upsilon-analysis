@@ -216,7 +216,7 @@ def build_dataframe(args):
         """)
 
     # Lazy calls: here the analysis tasks are "booked", but non yet run
-    logging.debug("Opening input file %s", args.input_file)
+    logging.info("Opening input file %s", args.input_file)
     df = ROOT.RDataFrame("Events", args.input_file)
     df = df.Filter("nMuon==2", "Two muons")
     df = df.Filter("Muon_charge[0]!=Muon_charge[1]", "Opposite charge")
@@ -336,9 +336,9 @@ def fit_histograms(histos, args):
        freedom, for goodness of fit.
 
     The argument `args` must be the result of `parse_args` or equivalent
-    object; of its fields only `output_dir` is used.
+    object; of its fields only `output_dir` and `vv` are used.
     """
-    logging.debug("Fitting histograms")
+    logging.info("Fitting histograms")
     # Fit function
     ff = ROOT.TF1("ff", "gaus(0)+gaus(3)+gaus(6)+pol1(9)", 8.5, 11.5)
     # Partial functions for plotting
@@ -366,18 +366,20 @@ def fit_histograms(histos, args):
     for (y_low, y_high), pt_bins in histos.items():
         pt_results = {}
         for (pt_low, pt_high), histo in pt_bins.items():
-            histo.SetTitle(f"{y_low}<|y|<{y_high}, "
-                           f"{pt_low}<p_{{T}}<{pt_high} GeV/c")
+            histo.SetTitle(f"y #in [{y_low:g},{y_high:g}), "
+                           f"p_{{T}} #in [{pt_low:g},{pt_high:g}) GeV/c")
+            histo.SetMinimum(0)
             histo.Draw("E")
             # Initial parameters
-            a = histo.GetMaximum()
-            b = histo.GetBinContent(1)
-            a -= b
+            a = histo.GetMaximum()  # Y(1s) peak height estimate
+            b = histo.GetBinContent(1)  # Bkg height estimate
+            a -= b  # Corrected peak height estimate
             ff.SetParameters(a, 9.46, 0.1,
-                             0.5 * a, 10.023, 0.1,
+                             0.5 * a, 10.023, 0.1,  # Thumb rule here
                              0.35 * a, 10.355, 0.1,
                              b, 0)
-            histo.Fit(ff, "QB")  # Use default migrad algorithm
+            logging.info("Fitting histogram %s", histo.GetTitle())
+            histo.Fit(ff, "B" + ("" if args.vv else "Q"))
             ga1.SetParameters(*(ff.GetParameter(i) for i in range(3)))
             ga2.SetParameters(*(ff.GetParameter(i) for i in range(3, 6)))
             ga3.SetParameters(*(ff.GetParameter(i) for i in range(6, 9)))
@@ -386,8 +388,9 @@ def fit_histograms(histos, args):
             ga2.Draw("L SAME")
             ga3.Draw("L SAME")
             bkg.Draw("L SAME")
-            canvas.Print(out_pdf, f"Title:{y_low}<|y|<{y_high}, "
-                         f"{pt_low}<pt<{pt_high}")
+            canvas.SetGrid()
+            canvas.Print(out_pdf, f"Title:y ({y_low:g},{y_high:g}), "
+                         f"pt ({pt_low:g},{pt_high:g})")
             pt_results[(pt_low, pt_high)] = FitResults(
                 get_ga_parameters(ga1, histo.GetBinWidth(1)),
                 get_ga_parameters(ga2, histo.GetBinWidth(1)),
@@ -410,10 +413,10 @@ if __name__ == "__main__":
         ROOT.EnableImplicitMT(args.threads)
     df = build_dataframe(args)
     mass_histos = book_histograms(df, args)
-    logging.debug("Actually running the analysis with the RDataFrame")
+    logging.info("Actually running the analysis with the RDataFrame")
     df.Report().Print()  # Here all the booked actions are actually run
     if not os.path.isdir(args.output_dir):
-        logging.debug("Creating output directory %s", args.output_dir)
+        logging.info("Creating output directory %s", args.output_dir)
         os.mkdir(output_dir)
     fits = fit_histograms(mass_histos, args)
     # TODO log fit results if verbose (use logging.info)

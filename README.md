@@ -1,4 +1,7 @@
 # cms-dimuon-upsilon-analysis
+[![Documentation Status](https://readthedocs.org/projects/cms-dimuon-upsilon-analysis/badge/?version=latest)](https://cms-dimuon-upsilon-analysis.readthedocs.io/en/latest/?badge=latest)
+
+
 Analysis of the di-muon events from CMS open data aimed at resolving and
 fitting the upsilon resonances' masses as a function of their transverse
 momentum.

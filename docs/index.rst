@@ -14,7 +14,7 @@ Documentation of upsilon_analysis
    readme
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
    :caption: API reference
 
    upsilon_analysis

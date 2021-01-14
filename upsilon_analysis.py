@@ -289,25 +289,29 @@ LineParameters = collections.namedtuple("LineParameters", "q m")
 FitResults = collections.namedtuple("FitResults", "y1 y2 y3 bkg chi2 ndf")
 
 
-def get_ga_parameters(ga, bin_width):
-    """Gets a `GausParameters` named tuple from a TF1.
+def get_ga_parameters(ga, bin_width, range=(8.5, 11.5)):
+    """Gets a `GausParameters` named tuple from a `TF1(..., "gaus(0)")`.
 
-    This function is necessary because a `TF1` using `gaus(n)` is used
-    for fitting, but that function is not normalized. If the number
-    of resonances occurred is what we need the normalization factor must
-    be taken into account.
+    This function takes a `TF1` defined by the formula "gaus(0)" as
+    input and returns a `GausParameters` where the field `a` is the
+    total number of occurrences given by the fit (while the other fields
+    are the usual mean and sigma). This function is necessary because
+    "gaus(0)" is *not* normalized.
 
-    Also, the bin width needs to be taken into account since the fit
-    uses the value of the function at the center of the bin, rather than
-    its integral as this produces a non-negligible speedup.
+    The argument `ga` is the `TF1` with the parameters set by the fit.
+
+    Assuming the histogram being fitted has fixed-width bins, the
+    integral of the gaussian will be equal to the integral of the
+    histogram, which is the total number of entries times the bin width.
+
+    Note that this also works if the fit option "I" (using the integral
+    of the function in the bin rather than its value at the center) is
+    used, since ROOT normalizes histogram integrals to the bin width.
     """
-    # TODO take into account bin width
-    p0 = ga.GetParameter(0)
-    ga.SetParameter(0, 1)
-    int = ga.Integral(8.5, 11.5)
     try:
-        return GausParameters(p0 / int, ga.GetParameter(1), ga.GetParameter(2))
-    except ZeroDivisionError:
+        p0 = ga.Integral(*range) / bin_width
+        return GausParameters(p0, ga.GetParameter(1), ga.GetParameter(2))
+    except ZeroDivisionError:  # This may happen when the fit fails
         return GausParameters(math.nan, ga.GetParameter(1), ga.GetParameter(2))
 
 
@@ -417,6 +421,5 @@ if __name__ == "__main__":
     fits = fit_histograms(mass_histos, args)
     # TODO log fit results if verbose (use logging.info)
     # TODO take into account failing fits when peaks are too small
-    # TODO check that, with different rebinning, the results don't change !!!
     # TODO remember to keep into account that the fit function returns the
     # number of occurrences of resonances N, but we need N/ΔptΔy

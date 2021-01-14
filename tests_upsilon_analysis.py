@@ -17,6 +17,7 @@
 import unittest
 import numbers
 import os
+import ROOT
 import upsilon_analysis
 
 
@@ -120,6 +121,26 @@ class TestUpsilonAnalysis(unittest.TestCase):
                               (34, 36), (36, 38), (38, 40), (40, 43),
                               (43, 46), (46, 50), (50, 55), (55, 60),
                               (60, 70), (70, 100), (10, 100)])
+
+    def test_get_ga_parameters(self):
+        """Tests for the function `get_ga_parameters`."""
+        ga = ROOT.TF1("testf", "gaus(0)", -6, 6)
+        hist = ROOT.TH1F("testh", "testh", 36, -6, 6)
+        bw = hist.GetBinWidth(1)
+        n = 0
+        for i in range(4):
+            n += 5000
+            hist.FillRandom("gaus", 5000)
+            # Without I
+            ga.SetParameters(1, 0, 1)
+            hist.Fit(ga, "QBN")
+            res = upsilon_analysis.get_ga_parameters(ga, bw, range=(-6, 6))
+            self.assertAlmostEqual(res.a / n, 1, delta=0.05)
+            # With I
+            ga.SetParameters(1, 0, 1)
+            hist.Fit(ga, "QBNI")
+            res = upsilon_analysis.get_ga_parameters(ga, bw, range=(-6, 6))
+            self.assertAlmostEqual(res.a / n, 1, delta=0.05)
 
 
 if __name__ == "__main__":

@@ -3,6 +3,7 @@
 *.png
 *.root
 !tests_upsilon_analysis_data.root
+*.csv
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

@@ -356,6 +356,7 @@ def fit_histograms(histos, args):
     ROOT.gStyle.SetStatH(0.05)
     ROOT.gStyle.SetStatW(0.15)
     out_pdf = os.path.join(args.output_dir, "mass_histos.pdf")
+    logging.info("Saving mass plots to %s", out_pdf)
     canvas.Print(f"{out_pdf}[")  # Open PDF to plot multiple pages
     ff.SetLineColor(ROOT.kBlack)
     ga1.SetLineColor(ROOT.kRed)
@@ -404,6 +405,17 @@ def fit_histograms(histos, args):
     return results
 
 
+def print_fit_results(results, file=None):
+    """Print fit results in CSV format to `file` (default stdout)."""
+    print("y_min,y_max,pt_min,pt_max,n_y1,m_y1,sigma_y1,n_y2,m_y2,sigma_y2,"
+          "n_y3,m_y3,sigma_y3,q,m,chi2,ndf", file=file)
+    for (y_low, y_high), pt_bins in results.items():
+        for (pt_low, pt_high), res in pt_bins.items():
+            cols = (y_low, y_high, pt_low, pt_high, *res.y1, *res.y2, *res.y3,
+                    *res.bkg, res.chi2, res.ndf)
+            print(",".join(str(x) for x in cols), file=file)
+
+
 if __name__ == "__main__":
     args = parse_args()
     logging.basicConfig(level=(logging.DEBUG if args.vv else
@@ -415,11 +427,18 @@ if __name__ == "__main__":
     mass_histos = book_histograms(df, args)
     logging.info("Actually running the analysis with the RDataFrame")
     df.Report().Print()  # Here all the booked actions are actually run
+
     if not os.path.isdir(args.output_dir):
         logging.info("Creating output directory %s", args.output_dir)
         os.mkdir(output_dir)
     fits = fit_histograms(mass_histos, args)
-    # TODO log fit results if verbose (use logging.info)
+    # Save fit results to a CSV file, for importing use TTree::ReadFile
+    out_csv = os.path.join(args.output_dir, "fit_results.csv")
+    logging.info("Saving fit results to %s", out_csv)
+    with open(out_csv, "w") as ofs:
+        print_fit_results(fits, file=ofs)
+
+
     # TODO take into account failing fits when peaks are too small
     # TODO remember to keep into account that the fit function returns the
     # number of occurrences of resonances N, but we need N/ΔptΔy

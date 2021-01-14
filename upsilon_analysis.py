@@ -308,11 +308,8 @@ def get_ga_parameters(ga, bin_width, range=(8.5, 11.5)):
     of the function in the bin rather than its value at the center) is
     used, since ROOT normalizes histogram integrals to the bin width.
     """
-    try:
-        p0 = ga.Integral(*range) / bin_width
-        return GausParameters(p0, ga.GetParameter(1), ga.GetParameter(2))
-    except ZeroDivisionError:  # This may happen when the fit fails
-        return GausParameters(math.nan, ga.GetParameter(1), ga.GetParameter(2))
+    p0 = ga.Integral(*range) / bin_width
+    return GausParameters(p0, ga.GetParameter(1), ga.GetParameter(2))
 
 
 def fit_histograms(histos, args):

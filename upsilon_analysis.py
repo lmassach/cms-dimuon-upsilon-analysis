@@ -133,7 +133,23 @@ def parse_args(args=None):
 
 
 def static_variables(**kwargs):
-    """Decorator to define C-like static variables for a function."""
+    """Decorator to define C-like static variables for a function.
+
+    Using the decorator like in
+        ```
+        @static_variables(variable=value)
+        def func(...):
+            ...
+        ```
+    is equivalent to
+        ```
+        def func(...):
+            ...
+        func.variable = value
+        ```
+    so the "static variable" can be accessed from within the function by
+    writing `func.variable`.
+    """
     def decorator(func):
         for k, v in kwargs.items():
             setattr(func, k, v)
@@ -154,6 +170,9 @@ def build_dataframe(args):
      - invariant mass cut between 8.5 and 11.5 GeV/c^2;
      - dimuon system rapidity and transverse momentum cuts defined by
        `args.{pt|y}_{min|max}`.
+
+    In the process, the columns `dimuon_mass`, `dimuon_pt` and
+    `dimuon_y` are created and populated.
 
     The argument `args` must be the result of `parse_args` or equivalent
     object; of its fields, these are used in this function:

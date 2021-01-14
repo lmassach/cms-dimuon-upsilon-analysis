@@ -105,7 +105,7 @@ def parse_args(args=None):
                               "chosen automatically by ROOT by default; if "
                               "set to 1, MT is not enabled at all."))
     parser.add_argument("--output-dir", "-o", default=".", metavar="DIR",
-                        help="Output directory for the plots.")
+                        help="Output directory for the plots; default is cd.")
     parser.add_argument("--pt-min", type=float, default=10., metavar="MIN",
                         help="Minimum resonance pt (GeV/c); default 10.")
     parser.add_argument("--pt-max", type=float, default=100., metavar="MAX",

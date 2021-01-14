@@ -7,13 +7,15 @@
 Documentation of upsilon_analysis
 =================================
 
-TODO
+.. toctree::
+   :maxdepth: 1
+   :caption: User guide
 
-API Modules
------------
+   readme
 
 .. toctree::
    :maxdepth: 2
+   :caption: API reference
 
    upsilon_analysis
    core

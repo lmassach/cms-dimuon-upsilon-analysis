@@ -11,6 +11,12 @@ This analysis is based on
 article ([arXiv](https://arxiv.org/abs/1501.07750)) and is originally intended
 to be used with [this](http://opendata.web.cern.ch/record/12341) dataset.
 
+## Usage
+The simplest way is to run the package. Command-line options can be listed by
+```bash
+python3 -m upsilon_analysis --help
+```
+
 ## Event selection
 The events in the dataset are selected by applying the following cuts:
  - the event must have exactly two opposite-charge muons;
@@ -55,3 +61,13 @@ fitResults.ReadFile("fit_results.csv");
 ```
 ROOT will deduce the column names from the first line, all columns will be
 floats (which is the intended result).
+
+## Testing
+The easiest way to run the tests is to use
+```bash
+python3 -m tests
+```
+
+For testing some of the core functions (`build_dataframe`, `book_histograms`) a
+small dataset (47 KiB) is used. It is in the tests folder, and consists of the
+first 1000 events of [this one](http://opendata.web.cern.ch/record/12341).

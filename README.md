@@ -1,6 +1,6 @@
 # cms-dimuon-upsilon-analysis
 [![Documentation Status](https://readthedocs.org/projects/cms-dimuon-upsilon-analysis/badge/?version=latest)](https://cms-dimuon-upsilon-analysis.readthedocs.io/en/latest/?badge=latest)
-
+<!--- This line is left for CI badge, just in case running ROOT proves feasible with some engine. Note that docs/readme.rst includes this markdown file from the fourth line on, so the title and the badges (and also this comment) are conveniently excluded. -->
 
 Analysis of the di-muon events from CMS open data aimed at resolving and
 fitting the upsilon resonances' masses as a function of their transverse

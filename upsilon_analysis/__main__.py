@@ -69,8 +69,8 @@ if __name__ == "__main__":
                       "(xsec plots %g<y<%g)", len(pt_bins) - len(ok_bins),
                       y_low, y_high)
         if len(ok_bins) < 2:
-            logging.warn("Not enough pt bins for xsec plots (%g<y<%g)",
-                         y_low, y_high)
+            logging.warning("Not enough pt bins for xsec plots (%g<y<%g)",
+                            y_low, y_high)
             continue
         # Graphs for the three Ys' cross sections
         graphs = [

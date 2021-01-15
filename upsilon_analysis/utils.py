@@ -15,11 +15,12 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 """Utility functions for the upsilon analysis."""
-import collections
+from collections import namedtuple
 
 __all__ = ["y_bin_edges", "pt_bin_edges", "bins", "static_variables",
            "GausParameters", "LineParameters", "FitResults",
-           "get_gaus_parameters", "print_fit_results", "Namespace"]
+           "get_gaus_parameters", "print_fit_results", "Namespace",
+           "sort_bins", "uniques"]
 
 
 def y_bin_edges(y_min, y_max, n_bins):
@@ -84,13 +85,17 @@ def bins(edges):
 def static_variables(**kwargs):
     """Decorator to define C-like static variables for a function.
 
-    Using the decorator like in::
+    Using the decorator like in:
+
+    .. code-block:: python
 
        @static_variables(variable=value)
        def func(...):
            ...
 
-    is equivalent to::
+    is equivalent to:
+
+    .. code-block:: python
 
        def func(...):
            ...
@@ -106,13 +111,39 @@ def static_variables(**kwargs):
     return decorator
 
 
-GausParameters = collections.namedtuple("GausParameters", "a m sigma")
+class GausParameters(namedtuple("GausParameters", "a m sigma")):
+    """A named tuple for the results of a fit with a Gaussian.
+
+    Fields:
+
+    0. ``a`` number of occurrences fitted (see ``get_gaus_parameters``)
+    1. ``m`` fitted pole mass (Gaussian's mean)
+    2. ``sigma`` fitted width (Gaussian's standard deviation)
+    """
 
 
-LineParameters = collections.namedtuple("LineParameters", "q m")
+class LineParameters(namedtuple("LineParameters", "q m")):
+    """A named tuple for the results of a fit with a line.
+
+    Fields:
+
+    0. ``q`` y-intercept / constant
+    1. ``m`` slope / coefficient of x
+    """
 
 
-FitResults = collections.namedtuple("FitResults", "y1 y2 y3 bkg chi2 ndf")
+class FitResults(namedtuple("FitResults", "y1 y2 y3 bkg chi2 ndf")):
+    """A named tuple for the results of the global fit.
+
+    Fields:
+
+    0. ``y1`` first resonance, type is ``GausParameters``
+    1. ``y2`` second resonance, type is ``GausParameters``
+    2. ``y3`` third resonance, type is ``GausParameters``
+    3. ``bkg`` background, type is ``LineParameters``
+    4. ``chi2`` the chi-squared of the fit
+    5. ``ndf`` the number of degrees of freedom of the fit
+    """
 
 
 def get_gaus_parameters(ga, bin_width, hist_range=(8.5, 11.5)):
@@ -178,3 +209,41 @@ class Namespace:
         """Same as the constuctor, but takes a dictionary."""
         for name, value in dictionary.items():
             setattr(self, name, value)
+
+
+def sort_bins(iterable):
+    """Takes an iterable of bins and returns a sorted list of them.
+
+    This function takes an iterable of bins, given as tuples
+    ``(bin_low, bin_high)``, and returns a list of the same bins, but
+    in ascending order.
+
+    The following requirements must be met:
+
+    *  all bins must be well defined, i.e. the lower limit must be
+       strictly less than the upper limit;
+    *  bins must not overlap;
+
+    if they are not, ``RuntimeError`` will be raised.
+    """
+    iterable = list(iterable)
+    if any(b[0] >= b[1] for b in iterable):
+        raise RuntimeError("Invalid bin found (lower limit > upper limit).")
+    iterable.sort(key=lambda b: b[0] + b[1])  # Sort by central value
+    if any(a[1] > b[0] for a, b in zip(iterable[:-1], iterable[1:])):
+        raise RuntimeError("Overlapping bins found.")
+    return iterable
+
+
+def uniques(iterable):
+    """Yields only uniques values out of a *sorted* iterable.
+
+    Loops over ``iterable`` (which is assumed to be sorted) and yields
+    its items only if they are unique (i.e. different from the previous,
+    since they are sorted).
+    """
+    prev = None
+    for item in iterable:
+        if item != prev:
+            yield item
+        prev = item

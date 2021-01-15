@@ -18,12 +18,16 @@
 import argparse
 import os
 import logging
+import array
+import itertools
+import math
 if "READTHEDOCS" not in os.environ:
     import ROOT  # This is hacky but allows the docs to compile
 from . import utils
 
 __all__ = ["parse_args", "make_args", "build_dataframe", "book_histograms",
-           "fit_histograms"]
+           "fit_histograms", "build_cross_section_hist",
+           "build_cross_section_graph"]
 
 
 def parse_args(args=None):
@@ -69,6 +73,10 @@ def parse_args(args=None):
                               "histograms with too few events are rebinned."))
     parser.add_argument("--no-quality", action="store_true",
                         help="Skip muon quality cuts.")
+    parser.add_argument("--max-mass-delta", type=float, default=0.01,
+                        help=("Max delta (in GeV) between fitted and known "
+                              "resonance mass to consider the fit good; "
+                              "default 0.01; known masses are from PDG."))
     parser.add_argument("-v", action="store_true", help="Verbose mode.")
     parser.add_argument("--vv", action="store_true", help="Very verbose mode.")
     return parser.parse_args(args)
@@ -181,7 +189,10 @@ def book_histograms(df, args):
     transverse momentum bin, and the values are histograms of the
     invariant mass distribution within that rapidity and transverse
     momentum bin. In other words this function returns an object like
-    ``{(y_low_1, y_high_1): {(pt_low_1, pt_high_1): TH1D, ...}, ...}``.
+
+    .. code-block:: python
+
+       {(y_low_1, y_high_1): {(pt_low_1, pt_high_1): TH1D, ...}, ...}
 
     The histograms are actually ``RResultPtr<TH1D>``, this means they
     are "booked" using the ``Histo1D`` method of the given
@@ -283,7 +294,7 @@ def fit_histograms(histos, args):
     for (y_low, y_high), pt_bins in histos.items():
         pt_results = {}
         for (pt_low, pt_high), histo in pt_bins.items():
-            histo.SetTitle(f"y #in [{y_low:g},{y_high:g}), "
+            histo.SetTitle(f"|y| #in [{y_low:g},{y_high:g}), "
                            f"p_{{T}} #in [{pt_low:g},{pt_high:g}) GeV/c")
             histo.SetMinimum(0)
             histo.Draw("E")
@@ -319,3 +330,79 @@ def fit_histograms(histos, args):
 
     canvas.Print(f"{out_pdf}]")  # Close PDF
     return results
+
+
+def build_cross_section_hist(fit_results):
+    """Builds a dσ/dpt vs pt histogram from a collection of fit results.
+
+    The argument ``fit_results`` should be a dictionary whose keys are
+    the pt bin limits, as a tuple, and whose values are the occurrences
+    of the resonance in that pt bin. In other words, it should be like
+
+    .. code-block:: python
+
+       {(pt_low_1, pt_high_1): n_occ_1, ... }
+
+    The results will be a ``TH1F`` whose bins are given by the keys of
+    ``fit_results``, and whose bins' contents are the respective numbers
+    of occurrences divided by the bin width. This will be proportional
+    to dσ/dpt: to get the real value one needs to ``TH1F::Scale`` the
+    histogram by ``1 / int_luminosity / efficiency / acceptance``.
+
+    If the given bins overlap, a ``RuntimeError`` will be raised.
+
+    If the bins are non-contiguos (i.e. there is a "hole"), a bin with
+    zero content will be made (this is important if you intend to fit
+    the histogram).
+    """
+    fit_bins = utils.sort_bins(fit_results.keys())
+    # TH1 requires contiguos bins
+    fit_bins_edges = utils.uniques(itertools.chain.from_iterable(fit_bins))
+    hist_bins = list(utils.bins(fit_bins_edges))
+    hist = ROOT.TH1F(
+        "xsecbr",
+        "Cross section;p_{T} [GeV/c];d#sigma/dp_{T}#times#it{Br} [arb. un.]",
+        len(hits_bins), array.array('d', fit_bins_edges)
+    )
+    for bin, n in fit_results.items():
+        bin_idx = hist_bins.index(bin) + 1
+        delta_pt = bin[1] - bin[0]
+        hist.SetBinContent(bin_idx, n / delta_pt)
+        hist.SetBinError(bin_idx, math.sqrt(n) / delta_pt)
+    return hist
+
+
+def build_cross_section_graph(fit_results):
+    """Builds a dσ/dpt vs pt graph from a collection of fit results.
+
+    The argument ``fit_results`` should be a dictionary whose keys are
+    the pt bin limits, as a tuple, and whose values are the occurrences
+    of the resonance in that pt bin. In other words, it should be like
+
+    .. code-block:: python
+
+       {(pt_low_1, pt_high_1): n_occ_1, ... }
+
+    The results will be a ``TGraphErrors`` where the x values are
+    defined by the centers of the pt bins, the x errors are defined by
+    the pt bins' width, the y values are the numbers of occurrences
+    divided by the pt bin width and the y error is estimated as the
+    square root of the number of occurrences divided by the pt bin
+    width. This way the y values will be proportional to dσ/dpt: to get
+    the real value one needs to scale the graph (with a custom function)
+    by ``1 / int_luminosity / efficiency / acceptance``.
+
+    If the given bins overlap, a ``RuntimeError`` will be raised.
+    """
+    fit_bins = utils.sort_bins(fit_results.keys())
+    graph = ROOT.TGraphErrors(
+        len(fit_bins),
+        array.array('d', ((b[0] + b[1]) / 2 for b in fit_bins)),
+        array.array('d', (fit_results[b] / (b[1] - b[0]) for b in fit_bins)),
+        array.array('d', ((b[1] - b[0]) / 2 for b in fit_bins)),
+        array.array('d', (math.sqrt(fit_results[b]) / (b[1] - b[0])
+                          for b in fit_bins))
+    )
+    graph.SetTitle("Cross section;p_{T} [GeV/c];"
+                   "d#sigma/dp_{T}#times#it{Br} [arb. un.]")
+    return graph

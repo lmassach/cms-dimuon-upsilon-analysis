@@ -79,3 +79,26 @@ class TestUpsilonAnalysisUtils(unittest.TestCase):
             hist.Fit(ga, "QBNI")
             res = utils.get_gaus_parameters(ga, bw, hist_range=(-6, 6))
             self.assertAlmostEqual(res.a / n, 1, delta=0.05)
+
+    def test_sort_bins(self):
+        """Tests for the function ``sort_bins``."""
+        self.assertEqual(utils.sort_bins([(0, 1), (1, 2), (2, 3), (4, 6)]),
+                         [(0, 1), (1, 2), (2, 3), (4, 6)])
+        self.assertEqual(utils.sort_bins([(4, 6), (0, 1), (1, 2), (2, 3)]),
+                         [(0, 1), (1, 2), (2, 3), (4, 6)])
+        self.assertRaises(RuntimeError, utils.sort_bins, [(1, 0), (1, 2)])
+        self.assertRaises(RuntimeError, utils.sort_bins, [(0, 0), (1, 2)])
+        self.assertRaises(RuntimeError, utils.sort_bins, [(0, 1), (0.5, 1.5)])
+        self.assertRaises(RuntimeError, utils.sort_bins, [(0, 1), (0, 0.5)])
+        self.assertRaises(RuntimeError, utils.sort_bins, [(0, 1), (0, 2)])
+        self.assertRaises(RuntimeError, utils.sort_bins, [(0, 1), (-0.5, 0.5)])
+        self.assertRaises(RuntimeError, utils.sort_bins, [(0, 1), (-0.5, 1.5)])
+        self.assertRaises(RuntimeError, utils.sort_bins, [(0, 1), (-10, 40)])
+        self.assertRaises(RuntimeError, utils.sort_bins, [(0, 1), (-10, 0.1)])
+        self.assertRaises(RuntimeError, utils.sort_bins, [(0, 1), (0.6, 40)])
+        self.assertEqual(utils.sort_bins((x, x + 1) for x in range(4)),
+                         [(0, 1), (1, 2), (2, 3), (3, 4)])
+
+    def test_uniques(self):
+        self.assertEqual(list(utils.uniques([0, 1, 2, 3])), [0, 1, 2, 3])
+        self.assertEqual(list(utils.uniques([0, 1, 1, 3])), [0, 1, 3])

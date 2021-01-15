@@ -65,6 +65,26 @@ fitResults.ReadFile("fit_results.csv");
 ROOT will deduce the column names from the first line, all columns will be
 floats (which is the intended result).
 
+## Differential cross sections
+For each y bin the differential cross section dσ/dpt (times the branching ratio
+to μμ) is computed from the fitted numbers of occurrences of each resonance. A
+graph of dσ/dpt vs pt is produced by using the pt bins: the number of
+occurrences in each bin is divided by the width of the bin; this quantity is
+proportional to dσ/dpt, and the real value can be obtained dividing by the
+integrated luminosity times the efficiency time the acceptance.
+
+In this analysis the dependence of efficiency/acceptance on pt is neglected.
+
+Not all the fitted values are used: if the fitted mass of a resonance is
+different from the known mass (from PDG) by more than a certain delta the fit
+is discarded (for all the resonances, as it might alter the background
+estimate). The command-line argument `--max-mass-delta` can be used to control
+this behavior (see command help for default value).
+
+The graphs are plotted and saved to `cross_section_plots.pdf`.
+
+Note: this part of the analysis is in the `__main__.py`.
+
 ## Testing
 The easiest way to run the tests is to use
 ```bash

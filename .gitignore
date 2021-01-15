@@ -2,7 +2,6 @@
 *.pdf
 *.png
 *.root
-!tests_upsilon_analysis_data.root
 !tests/*.root
 *.csv
 

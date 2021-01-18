@@ -59,8 +59,7 @@ class TestUpsilonAnalysisCore(unittest.TestCase):
     def test_build_dataframe(self):
         """Tests for function ``build_dataframe`` with test dataset."""
         print(f"Using test data {self._test_data}")
-        args = core.make_args(input_file=self._test_data)
-        df = core.build_dataframe(args)
+        df = core.build_dataframe(self._test_data)
         report = df.Report().GetValue()
         infos = {ci.GetName(): ci.GetEff() for ci in report}
         expected = {'Two muons': 55, 'Opposite charge': 75,
@@ -70,9 +69,8 @@ class TestUpsilonAnalysisCore(unittest.TestCase):
 
     def test_book_histograms(self):
         """Tests for function ``book_histograms``. with test dataset."""
-        args = core.make_args(input_file=self._test_data)
-        df = core.build_dataframe(args)
-        histos = core.book_histograms(df, args)
+        df = core.build_dataframe(self._test_data)
+        histos = core.book_histograms(df)
         self.assertCountEqual(list(histos.keys()),
                               [(0, 0.6), (0.6, 1.2), (0, 1.2)])
         for v in histos.values():

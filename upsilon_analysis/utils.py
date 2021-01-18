@@ -26,6 +26,14 @@ __all__ = ["y_bin_edges", "pt_bin_edges", "bins", "static_variables",
 def y_bin_edges(y_min, y_max, n_bins):
     """A generator that yields bin edges.
 
+    :param y_min: The lower edge of the first bin.
+    :type y_min: float
+    :param y_max: The upper edge of the last bin.
+    :type y_max: float
+    :param n_bins: The number of bins.
+    :type n_bins: int
+    :rtype: float
+
     Guarantees that ``y_min`` is the first item yielded and ``y_max`` is
     the last.
     """
@@ -37,6 +45,14 @@ def y_bin_edges(y_min, y_max, n_bins):
 
 def pt_bin_edges(pt_min, pt_max, bin_width):
     """A generator that makes the bins larger above a certain threshold.
+
+    :param pt_min: The lower edge of the first bin.
+    :type pt_min: float
+    :param pt_max: The upper edge of the last bin.
+    :type pt_max: float
+    :param bin_width: The width bins (but see below).
+    :type bin_width: float
+    :rtype: float
 
     Yields bin edges from ``pt_min`` to ``pt_max`` (both end are always
     present). Above 40 GeV/c, bins are made progressively wider:
@@ -70,6 +86,10 @@ def pt_bin_edges(pt_min, pt_max, bin_width):
 
 def bins(edges):
     """Roughly equivalent to ``zip(edges[:-1], edges[1:])``.
+
+    :param edges: The bins' edges.
+    :type edges: :class:`Iterable[float]`
+    :rtype: :class:`tuple[float, float]`
 
     Actually ``edges`` can also be an iterable that does not support
     slicing, so it is a more general implementation (altough probably
@@ -112,42 +132,56 @@ def static_variables(**kwargs):
 
 
 class GausParameters(namedtuple("GausParameters", "a m sigma")):
-    """A named tuple for the results of a fit with a Gaussian.
+    """A :class:`namedtuple` for the results of a fit with a Gaussian.
 
-    Fields:
-
-    0. ``a`` number of occurrences fitted (see ``get_gaus_parameters``)
-    1. ``m`` fitted pole mass (Gaussian's mean)
-    2. ``sigma`` fitted width (Gaussian's standard deviation)
+    :ivar a: Number of occurrences fitted (see
+       :any:`get_gaus_parameters`).
+    :vartype a: float
+    :ivar m: Fitted pole mass (Gaussian's mean).
+    :vartype m: float
+    :ivar sigma: Fitted width (Gaussian's standard deviation).
+    :vartype sigma: float
     """
 
 
 class LineParameters(namedtuple("LineParameters", "q m")):
     """A named tuple for the results of a fit with a line.
 
-    Fields:
-
-    0. ``q`` y-intercept / constant
-    1. ``m`` slope / coefficient of x
+    :ivar q: Constant / y-intercept.
+    :vartype q: float
+    :ivar m: Slope / coefficient of x.
+    :vartype m: float
     """
 
 
 class FitResults(namedtuple("FitResults", "y1 y2 y3 bkg chi2 ndf")):
     """A named tuple for the results of the global fit.
 
-    Fields:
-
-    0. ``y1`` first resonance, type is ``GausParameters``
-    1. ``y2`` second resonance, type is ``GausParameters``
-    2. ``y3`` third resonance, type is ``GausParameters``
-    3. ``bkg`` background, type is ``LineParameters``
-    4. ``chi2`` the chi-squared of the fit
-    5. ``ndf`` the number of degrees of freedom of the fit
+    :ivar y1: First resonance.
+    :vartype y1: GausParameters
+    :ivar y2: Second resonance.
+    :vartype y2: GausParameters
+    :ivar y3: Third resonance.
+    :vartype y3: GausParameters
+    :ivar bkg: Background.
+    :vartype bkg: LineParameters
+    :ivar chi2: Chi-squared of the fit.
+    :vartype chi2: float
+    :ivar ndf: Number of degrees of freedom of the fit.
+    :vartype ndf: float
     """
 
 
 def get_gaus_parameters(ga, bin_width, hist_range=(8.5, 11.5)):
-    """Gets a ``GausParameters`` named tuple from a ``TF1``.
+    """Gets a :any:`GausParameters` from a ``TF1``.
+
+    :param ga: The ``TF1`` with the parameters to get.
+    :type ga: ROOT.TF1
+    :param bin_width: The width of the bin of the fitted histogram.
+    :type bin_width: float
+    :param hist_range: The range of the fitted histogram.
+    :type hist_range: :class:`tuple[float, float]`, optional
+    :rtype: GausParameters
 
     This function takes a ``TF1`` defined by the formula "gaus(0)" as
     input and returns a ``GausParameters`` where the field ``a`` is the
@@ -174,7 +208,15 @@ def get_gaus_parameters(ga, bin_width, hist_range=(8.5, 11.5)):
 
 
 def print_fit_results(results, file=None):
-    """Print fit results in CSV format to ``file`` (default stdout)."""
+    """Print fit results in CSV format to ``file`` (default stdout).
+
+    :param results: A dictionary like that returned by
+       :any:`core.fit_histograms`
+    :type results: :class:`dict[tuple[float, float],
+       dict[tuple[float, float], FitResults]]`
+    :param file: The file to write to. Default is stdout.
+    :return: None
+    """
     print("y_min,y_max,pt_min,pt_max,n_y1,m_y1,sigma_y1,n_y2,m_y2,sigma_y2,"
           "n_y3,m_y3,sigma_y3,q,m,chi2,ndf", file=file)
     for (y_low, y_high), pt_bins in results.items():
@@ -187,7 +229,7 @@ def print_fit_results(results, file=None):
 class Namespace:
     """A class for holding options similar to ``argparse.Namespace``.
 
-    ``kwargs`` is used to set the initial attributes of the object.
+    :param \**kwargs: Used to set the object's fields.
     """
     def __init__(self, **kwargs):
         self.update(kwargs)
@@ -206,13 +248,23 @@ class Namespace:
         return sorted(self.__dict__.items())
 
     def update(self, dictionary):
-        """Same as the constuctor, but takes a dictionary."""
+        """Sets the object's fields to the values given by the dict.
+
+        :param dictionary: A dict with the values to set to the fields.
+        :type dictionary: dict
+        :return: None
+        """
         for name, value in dictionary.items():
             setattr(self, name, value)
 
 
 def sort_bins(iterable):
     """Takes an iterable of bins and returns a sorted list of them.
+
+    :param iterable: The iterable with the bins to sort.
+    :type iterable: :class:`Iterable[tuple[float, float]]`
+    :raises RuntimeError: If the bins are not valid or overlap.
+    :rtype: :class:`list[tuple[float, float]]`
 
     This function takes an iterable of bins, given as tuples
     ``(bin_low, bin_high)``, and returns a list of the same bins, but
@@ -236,7 +288,10 @@ def sort_bins(iterable):
 
 
 def uniques(iterable):
-    """Yields only uniques values out of a *sorted* iterable.
+    """Yields only uniques values out of a **sorted** iterable.
+
+    :param iterable: A **sorted** iterable of objects that support the
+       ``!=`` operator.
 
     Loops over ``iterable`` (which is assumed to be sorted) and yields
     its items only if they are unique (i.e. different from the previous,

@@ -13,6 +13,7 @@ Documentation of upsilon_analysis
    :caption: User guide
 
    readme
+   example
 
 .. toctree::
    :maxdepth: 1

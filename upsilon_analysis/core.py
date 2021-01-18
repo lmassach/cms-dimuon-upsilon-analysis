@@ -73,10 +73,10 @@ def parse_args(args=None):
                               "histograms with too few events are rebinned."))
     parser.add_argument("--no-quality", action="store_true",
                         help="Skip muon quality cuts.")
-    parser.add_argument("--max-mass-delta", type=float, default=0.01,
+    parser.add_argument("--max-mass-delta", type=float, default=0.025,
                         help=("Max delta (in GeV) between fitted and known "
                               "resonance mass to consider the fit good; "
-                              "default 0.01; known masses are from PDG."))
+                              "default 0.025; known masses are from PDG."))
     parser.add_argument("-v", action="store_true", help="Verbose mode.")
     parser.add_argument("--vv", action="store_true", help="Very verbose mode.")
     return parser.parse_args(args)
@@ -96,8 +96,26 @@ def make_args(**kwargs):
 
 
 @utils.static_variables(c_functions_defined=False)
-def build_dataframe(args):
-    """
+def build_dataframe(input_file, no_quality=False, y_min=0, y_max=1.2,
+                    pt_min=10, pt_max=100, **kwargs):
+    """Opens the given file in an ``RDataFrame``.
+
+    :param input_file: The file from which to take the Events `TTree`.
+    :type input_file: str
+    :param no_quality: Wether to skip muon quality cuts (see readme).
+    :type no_quality: bool, optional
+    :param y_min: Minimum abs(y) for the dimuon system.
+    :type y_min: float, optional
+    :param y_max: Maximum abs(y) for the dimuon system.
+    :type y_max: float, optional
+    :param pt_min: Minimum pt in GeV/c for the dimuon system.
+    :type pt_min: float, optional
+    :param pt_max: Maximum pt in GeV/c for the dimuon system.
+    :type pt_max: float, optional
+    :param \**kwargs: Only used to avoid errors when the result of
+       :any:`parse_args` is given.
+    :rtype: ROOT.RDataFrame
+
     Makes a ``ROOT.RDataFrame`` with the given input, applies cuts
     common to all analysis tasks by calling ``Filter`` and returns the
     result. Nothing will be run as only lazy action are requested.
@@ -105,21 +123,13 @@ def build_dataframe(args):
     The cuts performed (actually "booked") are:
 
     *  selection of only events with exactly two opposite charge muons;
-    *  quality cuts (see readme) unless ``args.no_quality`` is ``True``;
+    *  quality cuts (see readme) unless ``no_quality`` is ``True``;
     *  invariant mass cut between 8.5 and 11.5 GeV/c^2;
     *  dimuon system rapidity and transverse momentum cuts defined by
-       ``args.{pt|y}_{min|max}``.
+       ``y_min``, ``y_max``, ``pt_min``, ``pt_max``.
 
     In the process, the columns ``dimuon_mass``, ``dimuon_pt`` and
     ``dimuon_y`` are created and populated.
-
-    The argument ``args`` must be the result of ``parse_args`` or
-    equivalent object; of its fields, these are used in this function:
-
-    *  ``input_file``
-    *  ``no_quality``
-    *  ``y_min`` and ``y_max``
-    *  ``pt_min`` and ``pt_max``
 
     This function uses ``ROOT.gInterpreter.Declare`` to define some
     global C++ functions, namely:
@@ -158,11 +168,11 @@ def build_dataframe(args):
 
     # Lazy calls: here the analysis tasks are "booked", but non yet run
     logger = logging.getLogger(__name__)
-    logger.info("Opening input file %s", args.input_file)
-    df = ROOT.RDataFrame("Events", args.input_file)
+    logger.info("Opening input file %s", input_file)
+    df = ROOT.RDataFrame("Events", input_file)
     df = df.Filter("nMuon==2", "Two muons")
     df = df.Filter("Muon_charge[0]!=Muon_charge[1]", "Opposite charge")
-    if not args.no_quality:
+    if not no_quality:
         df = df.Filter("abs(Muon_eta[0])<1.6&&abs(Muon_eta[1])<1.6"
                        "&&Muon_pt[0]>3&&Muon_pt[1]>3"
                        "&&(Muon_pt[0]>3.5||abs(Muon_eta[0])>1.4)"
@@ -173,16 +183,40 @@ def build_dataframe(args):
     df = df.Define("dimuon_mass", "m12(Muon_pt,Muon_eta,Muon_phi,Muon_mass)")
     df = df.Filter("8.5<dimuon_mass&&dimuon_mass<11.5", "Mass limits")
     df = df.Define("dimuon_y", "y12(Muon_pt,Muon_eta,Muon_phi,Muon_mass)")
-    df = df.Filter(f"{args.y_min}<=abs(dimuon_y)&&abs(dimuon_y)<{args.y_max}",
+    df = df.Filter(f"{y_min}<=abs(dimuon_y)&&abs(dimuon_y)<{y_max}",
                    "Rapidity limits")
     df = df.Define("dimuon_pt", "pt12(Muon_pt,Muon_eta,Muon_phi,Muon_mass)")
-    df = df.Filter(f"{args.pt_min}<dimuon_pt&&dimuon_pt<{args.pt_max}",
+    df = df.Filter(f"{pt_min}<dimuon_pt&&dimuon_pt<{pt_max}",
                    "pt limits")
     return df
 
 
-def book_histograms(df, args):
-    """
+def book_histograms(df, mass_bins=100, y_min=0, y_max=1.2, y_bins=2,
+                    pt_min=10, pt_max=100, pt_bin_width=2, **kwargs):
+    """Pepares mass histograms to be made by the ``RDataFrame``.
+
+    :param df: The ``RDataFrame`` to work on.
+    :type df: ROOT.RDataFrame
+    :param mass_bins: The number of bins for the mass histograms.
+    :type mass_bins: int, optional
+    :param y_min: Minimum for abs(y) binning.
+    :type y_min: float, optional
+    :param y_max: Maximum for abs(y) binning.
+    :type y_max: float, optional
+    :param y_bins: Number of abs(y) bins.
+    :type y_bins: int, optional
+    :param pt_min: Minimum, in GeV/c, for pt binning.
+    :type pt_min: float, optional
+    :param pt_max: Maximum, in GeV/c, for pt binning.
+    :type pt_max: float, optional
+    :param pt_bin_width: Width, in GeV/c, of the pt bins (see
+       :any:`utils.pt_bin_edges`)
+    :type pt_bin_width: float, optional
+    :param \**kwargs: Only used to avoid errors when the result of
+       :any:`parse_args` is given.
+    :rtype: :class:`dict[tuple[float, float], dict[tuple[float, float],
+       TH1D]]`
+
     Builds a dictionary whose keys are tuples ``(y_low, y_high)``, i.e.
     the edges of a rapidity bin, and the values are dictionaries whose
     keys are tuples ``(pt_low, pt_high)``, i.e. the edges of a
@@ -199,14 +233,7 @@ def book_histograms(df, args):
     ``RDataFrame df``, but are not actually built because that is a lazy
     action.
 
-    The argument ``args`` must be the result of ``parse_args`` or
-    equivalent object; of its fields, these are used in this function:
-
-    *  ``mass_bins``
-    *  ``y_min``, ``y_max`` and ``y_bins``
-    *  ``pt_min``, ``pt_max`` and ``pt_bin_width``
-
-    The bins are chosen by the fields of ``args``; beside those, a pt
+    The bins are chosen by the parameters; beside those, a pt
     bin that includes all pt values is present for each y bin, and a y
     bin that includes all y values is also present.
     """
@@ -214,55 +241,46 @@ def book_histograms(df, args):
     logger.debug("Booking histograms")
     histo_model = ("dimuon_mass",
                    "m_{#mu#mu};m_{#mu#mu} [GeV/c^{2}];Occurrences / bin",
-                   args.mass_bins, 8.5, 11.5)
-    edges = utils.y_bin_edges(args.y_min, args.y_max, args.y_bins)
+                   mass_bins, 8.5, 11.5)
+    edges = utils.y_bin_edges(y_min, y_max, y_bins)
     y_bins = {bin: {} for bin in utils.bins(edges)}
-    y_bins[(args.y_min, args.y_max)] = {}  # Bin with all rapidities
+    y_bins[(y_min, y_max)] = {}  # Bin with all rapidities
     for (y_low, y_high), pt_bins in y_bins.items():
-        y_filtered = df.Filter(f"{y_low}<=abs(dimuon_y)&&"
-                               f"abs(dimuon_y)<{y_high}")
-        edges = utils.pt_bin_edges(args.pt_min, args.pt_max, args.pt_bin_width)
+        y_filtered = df.Filter(
+            f"{y_low}<=abs(dimuon_y)&&abs(dimuon_y)<{y_high}")
+        edges = utils.pt_bin_edges(pt_min, pt_max, pt_bin_width)
         for pt_low, pt_high in utils.bins(edges):
-            pt_filtered = y_filtered.Filter(f"{pt_low}<dimuon_pt&&"
-                                            f"dimuon_pt<{pt_high}")
-            pt_bins[(pt_low, pt_high)] = pt_filtered.Histo1D(histo_model,
-                                                             "dimuon_mass")
-        pt_bins[(args.pt_min, args.pt_max)] = y_filtered.Histo1D(histo_model,
-                                                                 "dimuon_mass")
+            pt_filtered = y_filtered.Filter(
+                f"{pt_low}<dimuon_pt&&dimuon_pt<{pt_high}")
+            pt_bins[(pt_low, pt_high)] = pt_filtered.Histo1D(
+                histo_model, "dimuon_mass")
+        pt_bins[(pt_min, pt_max)] = y_filtered.Histo1D(
+            histo_model, "dimuon_mass")
     return y_bins
 
 
-def fit_histograms(histos, args):
-    """
-    Fits the histograms ``histos`` returned by ``book_histograms``,
+def fit_histograms(histos, output_dir=".", vv=False, **kwargs):
+    """Automatic mass histograms fitting.
+
+    :param histos: Dictionary of dictionaries of histograms (see below).
+    :type histos: dict
+    :param output_dir: Output directory for the PDF with the histograms.
+    :type output_dir: str
+    :param vv: Very verbose mode.
+    :type vv: bool
+    :param \**kwargs: Only used to avoid errors when the result of
+       :any:`parse_args` is given.
+    :rtype: :class:`dict[tuple[float, float], dict[tuple[float, float],
+       utils.FitResults]]`
+
+    Fits the histograms ``histos`` returned by :any:`book_histograms`,
     saves the plots to "mass_histos.pdf" and returns the results of the
     fits in a dictionary of dictionaries similar to ``histos``.
 
     The fit function used is the sum of three Gaussian functions for the
     resonances plus a linear parametrization for the background.
 
-    The results of each fit are returned as a ``FitResults`` named
-    tuple, which has six fields:
-
-    *  ``y1``, ``y2`` and ``y3`` are ``GausParameters`` named tuples,
-       whose fields are:
-
-       *  ``a`` the factor multiplying the normalized distribution,
-          a.k.a. number of occurrences of the resonance;
-       *  ``m`` the mean of the resonance, a.k.a. pole mass;
-       *  ``sigma`` the resonance width parameter;
-
-    *  ``bkg`` is a ``LineParameters`` named tuple, whose fields are:
-
-       *  ``q`` the vertical intercept of the line;
-       *  ``m`` the slope of the line;
-
-    *  ``chi2`` and ``ndf`` are the chi squared and the number of
-       degrees of freedom, for goodness of fit tests.
-
-    The argument ``args`` must be the result of ``parse_args`` or
-    equivalent object; of its fields only ``output_dir`` and `vv` are
-    used.
+    The results of each fit are returned as a :any:`utils.FitResults`.
     """
     logger = logging.getLogger(__name__)
     logger.info("Fitting histograms")
@@ -282,7 +300,7 @@ def fit_histograms(histos, args):
     ROOT.gStyle.SetStatY(0.91)
     ROOT.gStyle.SetStatH(0.05)
     ROOT.gStyle.SetStatW(0.15)
-    out_pdf = os.path.join(args.output_dir, "mass_histos.pdf")
+    out_pdf = os.path.join(output_dir, "mass_histos.pdf")
     logger.info("Saving mass plots to %s", out_pdf)
     canvas.Print(f"{out_pdf}[")  # Open PDF to plot multiple pages
     ff.SetLineColor(ROOT.kBlack)
@@ -307,7 +325,7 @@ def fit_histograms(histos, args):
                              0.35 * a, 10.355, 0.1,
                              b, 0)
             logger.info("Fitting histogram %s", histo.GetTitle())
-            histo.Fit(ff, "B" + ("" if args.vv else "Q"))
+            histo.Fit(ff, "B" + ("" if vv else "Q"))
             ga1.SetParameters(*(ff.GetParameter(i) for i in range(3)))
             ga2.SetParameters(*(ff.GetParameter(i) for i in range(3, 6)))
             ga3.SetParameters(*(ff.GetParameter(i) for i in range(6, 9)))
@@ -334,6 +352,10 @@ def fit_histograms(histos, args):
 
 def build_cross_section_hist(fit_results):
     """Builds a dσ/dpt vs pt histogram from a collection of fit results.
+
+    :param fit_results: Dictionary of the occurrences in each bin.
+    :type fit_results: :class:`dict[tuple[float, float], int]`
+    :rtype: ROOT.TH1F
 
     The argument ``fit_results`` should be a dictionary whose keys are
     the pt bin limits, as a tuple, and whose values are the occurrences
@@ -374,6 +396,10 @@ def build_cross_section_hist(fit_results):
 
 def build_cross_section_graph(fit_results):
     """Builds a dσ/dpt vs pt graph from a collection of fit results.
+
+    :param fit_results: Dictionary of the occurrences in each bin.
+    :type fit_results: :class:`dict[tuple[float, float], int]`
+    :rtype: ROOT.TGraphErrors
 
     The argument ``fit_results`` should be a dictionary whose keys are
     the pt bin limits, as a tuple, and whose values are the occurrences

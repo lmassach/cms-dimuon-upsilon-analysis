@@ -24,6 +24,7 @@ from .utils import print_fit_results
 
 if __name__ == "__main__":
     args = parse_args()
+    kwargs = vars(args)
     logging.basicConfig(level=(logging.DEBUG if args.vv else
                                (logging.INFO if args.v else logging.WARNING)))
 
@@ -31,8 +32,8 @@ if __name__ == "__main__":
     if args.threads != 1:
         logging.debug("Enabling MT")
         ROOT.EnableImplicitMT(args.threads)
-    df = build_dataframe(args)
-    mass_histos = book_histograms(df, args)
+    df = build_dataframe(**kwargs)
+    mass_histos = book_histograms(df, **kwargs)
     logging.info("Actually running the analysis with the RDataFrame")
     df.Report().Print()  # Here all the booked actions are actually run
 
@@ -40,7 +41,7 @@ if __name__ == "__main__":
     if not os.path.isdir(args.output_dir):
         logging.info("Creating output directory %s", args.output_dir)
         os.mkdir(args.output_dir)
-    fits = fit_histograms(mass_histos, args)
+    fits = fit_histograms(mass_histos, **kwargs)
     # Save fit results to a CSV file, for importing use TTree::ReadFile
     out_csv = os.path.join(args.output_dir, "fit_results.csv")
     logging.info("Saving fit results to %s", out_csv)
@@ -87,5 +88,5 @@ if __name__ == "__main__":
     canvas.Print(f"{out_pdf}]")  # Close PDF
 
     del canvas
-    # TODO put the xsec part in a function?
-    # TODO use acceptance tables from article when bins are default
+    # TODO use acceptance tables from article, adding a command-line
+    # argument for loading that table from a csv

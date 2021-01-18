@@ -18,6 +18,7 @@ package_name = 'upsilon_analysis'
 package_root = os.path.abspath('..')
 sys.path.insert(0, package_root)
 sys.path.insert(0, os.path.join(package_root, package_name))
+sys.path.append(os.path.abspath("."))  # To import dummy modules
 
 
 # -- Project information -----------------------------------------------------

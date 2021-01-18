@@ -21,8 +21,7 @@ import logging
 import array
 import itertools
 import math
-if "READTHEDOCS" not in os.environ:
-    import ROOT  # This is hacky but allows the docs to compile
+import ROOT
 from . import utils
 
 __all__ = ["parse_args", "make_args", "build_dataframe", "book_histograms",

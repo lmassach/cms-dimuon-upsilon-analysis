@@ -39,23 +39,6 @@ class TestUpsilonAnalysisCore(unittest.TestCase):
         for k in a.keys():
             self.assertAlmostEqual(a[k], b[k], places=places)
 
-    def test_parse_args(self):
-        """Tests for function ``parse_args``."""
-        args = core.parse_args([])
-        self.assertIsInstance(args.input_file, str)
-        self.assertIsInstance(args.threads, numbers.Integral)
-        self.assertIsInstance(args.output_dir, str)
-        self.assertIsInstance(args.pt_min, numbers.Real)
-        self.assertIsInstance(args.pt_max, numbers.Real)
-        self.assertIsInstance(args.pt_bin_width, numbers.Real)
-        self.assertIsInstance(args.y_min, numbers.Real)
-        self.assertIsInstance(args.y_max, numbers.Real)
-        self.assertIsInstance(args.y_bins, numbers.Integral)
-        self.assertIsInstance(args.mass_bins, numbers.Integral)
-        self.assertIsInstance(args.no_quality, bool)
-        self.assertIsInstance(args.v, bool)
-        self.assertIsInstance(args.vv, bool)
-
     def test_build_dataframe(self):
         """Tests for function ``build_dataframe`` with test dataset."""
         print(f"Using test data {self._test_data}")

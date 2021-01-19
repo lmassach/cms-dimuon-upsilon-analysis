@@ -23,7 +23,18 @@ from .utils import print_fit_results
 
 
 if __name__ == "__main__":
-    args = parse_args()
+    parser = make_argument_parser()
+    parser.add_argument("--threads", "-j", type=int, default=0, metavar="N",
+                        help=("Number of threads, see ROOT::EnableImplicitMT; "
+                              "chosen automatically by ROOT by default; if "
+                              "set to 1, MT is not enabled at all."))
+    parser.add_argument("--output-dir", "-o", default=".", metavar="DIR",
+                        help="Output directory for the plots; default is cd.")
+    parser.add_argument("--max-mass-delta", type=float, default=0.025,
+                        help=("Max delta (in GeV) between fitted and known "
+                              "resonance mass to consider the fit good; "
+                              "default 0.025; known masses are from PDG."))
+    args = parser.parse_args()
     kwargs = vars(args)
     logging.basicConfig(level=(logging.DEBUG if args.vv else
                                (logging.INFO if args.v else logging.WARNING)))

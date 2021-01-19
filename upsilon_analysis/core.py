@@ -24,18 +24,33 @@ import math
 import ROOT
 from . import utils
 
-__all__ = ["parse_args", "make_args", "build_dataframe", "book_histograms",
+__all__ = ["make_argument_parser", "build_dataframe", "book_histograms",
            "fit_histograms", "build_cross_section_hist",
            "build_cross_section_graph"]
 
 
-def parse_args(args=None):
-    """Command-line arguments parsing function.
+def make_argument_parser():
+    """Prepares an :class:`ArgumentParser` with some analysis arguments.
 
-    Builds an ``argparse.ArgumentParser`` reading all the appropriate
-    command-line arguments for the analysis, calls its ``parse_args``
-    method with the given ``args`` (so it uses ``sys.argv`` as default)
-    and returns its result.
+    :rtype: argparse.ArgumentParser
+
+    Builds an :class`argparse.ArgumentParser` with all the appropriate
+    command-line arguments for the analysis already added; these are:
+
+    *  ``--input-file`` or ``-i``: optional, default input file is a
+       ``root://`` link to CMS Open Data;
+    *  ``--pt-min``: in GeV/c, optional, default 10;
+    *  ``--pt-max``: in GeV/c, optional, default 100;
+    *  ``--pt-bin-width``: in GeV/c, optional, default 2;
+    *  ``--y-min``: in absolute value, optional, default 0;
+    *  ``--y-max``: in absolute value, optional, default 1.2;
+    *  ``--y-bins``: number of y bins, optional, default 2;
+    *  ``--mass-bins``: number of mass bins, optional, default 100 (the
+       range is fixed to 8.5-11.5 GeV/c^2);
+    *  ``--no-quality``: suppress quality cuts;
+    *  ``-v``: verbose mode, can be used for logging setup; default
+       ``False``;
+    *  ``--vv``: very verbose mode, see above; default ``False``.
     """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input-file", "-i", metavar="PATH",
@@ -45,12 +60,6 @@ def parse_args(args=None):
                         help=("Input file to be used, optional; the default "
                               "file is opened from root://eospublic.cern.ch; "
                               "any URL supported by RDataFrame can be used."))
-    parser.add_argument("--threads", "-j", type=int, default=0, metavar="N",
-                        help=("Number of threads, see ROOT::EnableImplicitMT; "
-                              "chosen automatically by ROOT by default; if "
-                              "set to 1, MT is not enabled at all."))
-    parser.add_argument("--output-dir", "-o", default=".", metavar="DIR",
-                        help="Output directory for the plots; default is cd.")
     parser.add_argument("--pt-min", type=float, default=10., metavar="MIN",
                         help="Minimum resonance pt (GeV/c); default 10.")
     parser.add_argument("--pt-max", type=float, default=100., metavar="MAX",
@@ -72,26 +81,9 @@ def parse_args(args=None):
                               "histograms with too few events are rebinned."))
     parser.add_argument("--no-quality", action="store_true",
                         help="Skip muon quality cuts.")
-    parser.add_argument("--max-mass-delta", type=float, default=0.025,
-                        help=("Max delta (in GeV) between fitted and known "
-                              "resonance mass to consider the fit good; "
-                              "default 0.025; known masses are from PDG."))
     parser.add_argument("-v", action="store_true", help="Verbose mode.")
     parser.add_argument("--vv", action="store_true", help="Very verbose mode.")
-    return parser.parse_args(args)
-
-
-def make_args(**kwargs):
-    """Makes an object like the one returned by ``parse_args``.
-
-    The object returned has all the required fields with their default
-    values, unless the keyword arguments are used to change them. This
-    allows to use a more Pythonic syntax to pass options to the core
-    functions.
-    """
-    ns = utils.Namespace(**vars(parse_args([])))
-    ns.update(kwargs)
-    return ns
+    return parser
 
 
 @utils.static_variables(c_functions_defined=False)
@@ -112,7 +104,7 @@ def build_dataframe(input_file, no_quality=False, y_min=0, y_max=1.2,
     :param pt_max: Maximum pt in GeV/c for the dimuon system.
     :type pt_max: float, optional
     :param \**kwargs: Only used to avoid errors when the result of
-       :any:`parse_args` is given.
+       :any:`make_argument_parser` is given.
     :rtype: ROOT.RDataFrame
 
     Makes a ``ROOT.RDataFrame`` with the given input, applies cuts
@@ -212,7 +204,7 @@ def book_histograms(df, mass_bins=100, y_min=0, y_max=1.2, y_bins=2,
        :any:`utils.pt_bin_edges`)
     :type pt_bin_width: float, optional
     :param \**kwargs: Only used to avoid errors when the result of
-       :any:`parse_args` is given.
+       :any:`make_argument_parser` is given.
     :rtype: :class:`dict[tuple[float, float], dict[tuple[float, float],
        TH1D]]`
 
@@ -258,17 +250,18 @@ def book_histograms(df, mass_bins=100, y_min=0, y_max=1.2, y_bins=2,
     return y_bins
 
 
-def fit_histograms(histos, output_dir=".", vv=False, **kwargs):
+def fit_histograms(histos, output_dir=None, vv=False, **kwargs):
     """Automatic mass histograms fitting.
 
     :param histos: Dictionary of dictionaries of histograms (see below).
     :type histos: dict
-    :param output_dir: Output directory for the PDF with the histograms.
+    :param output_dir: Output directory for the PDF with the histograms;
+       if not given or ``None`` no PDF is produced.
     :type output_dir: str
     :param vv: Very verbose mode.
     :type vv: bool
     :param \**kwargs: Only used to avoid errors when the result of
-       :any:`parse_args` is given.
+       :any:`make_argument_parser` is given.
     :rtype: :class:`dict[tuple[float, float], dict[tuple[float, float],
        utils.FitResults]]`
 
@@ -292,29 +285,31 @@ def fit_histograms(histos, output_dir=".", vv=False, **kwargs):
     bkg = ROOT.TF1("bkg", "pol1(0)", 8.5, 11.5)
 
     results = {}
-    canvas = ROOT.TCanvas("", "", 640, 480)
-    ROOT.gStyle.SetOptStat(10)
-    ROOT.gStyle.SetOptFit(100)
-    ROOT.gStyle.SetStatX(0.91)
-    ROOT.gStyle.SetStatY(0.91)
-    ROOT.gStyle.SetStatH(0.05)
-    ROOT.gStyle.SetStatW(0.15)
-    out_pdf = os.path.join(output_dir, "mass_histos.pdf")
-    logger.info("Saving mass plots to %s", out_pdf)
-    canvas.Print(f"{out_pdf}[")  # Open PDF to plot multiple pages
-    ff.SetLineColor(ROOT.kBlack)
-    ga1.SetLineColor(ROOT.kRed)
-    ga2.SetLineColor(ROOT.kGreen + 3)
-    ga3.SetLineColor(ROOT.kMagenta + 2)
-    bkg.SetLineColor(ROOT.kBlue)
+    if output_dir is not None:
+        canvas = ROOT.TCanvas("", "", 640, 480)
+        ROOT.gStyle.SetOptStat(10)
+        ROOT.gStyle.SetOptFit(100)
+        ROOT.gStyle.SetStatX(0.91)
+        ROOT.gStyle.SetStatY(0.91)
+        ROOT.gStyle.SetStatH(0.05)
+        ROOT.gStyle.SetStatW(0.15)
+        out_pdf = os.path.join(output_dir, "mass_histos.pdf")
+        logger.info("Saving mass plots to %s", out_pdf)
+        canvas.Print(f"{out_pdf}[")  # Open PDF to plot multiple pages
+        ff.SetLineColor(ROOT.kBlack)
+        ga1.SetLineColor(ROOT.kRed)
+        ga2.SetLineColor(ROOT.kGreen + 3)
+        ga3.SetLineColor(ROOT.kMagenta + 2)
+        bkg.SetLineColor(ROOT.kBlue)
 
     for (y_low, y_high), pt_bins in histos.items():
         pt_results = {}
         for (pt_low, pt_high), histo in pt_bins.items():
-            histo.SetTitle(f"|y| #in [{y_low:g},{y_high:g}), "
-                           f"p_{{T}} #in [{pt_low:g},{pt_high:g}) GeV/c")
-            histo.SetMinimum(0)
-            histo.Draw("E")
+            if output_dir is not None:
+                histo.SetTitle(f"|y| #in [{y_low:g},{y_high:g}), "
+                               f"p_{{T}} #in [{pt_low:g},{pt_high:g}) GeV/c")
+                histo.SetMinimum(0)
+                histo.Draw("E")
             # Initial parameters
             a = histo.GetMaximum()  # Y(1s) peak height estimate
             b = histo.GetBinContent(1)  # Bkg height estimate
@@ -329,13 +324,14 @@ def fit_histograms(histos, output_dir=".", vv=False, **kwargs):
             ga2.SetParameters(*(ff.GetParameter(i) for i in range(3, 6)))
             ga3.SetParameters(*(ff.GetParameter(i) for i in range(6, 9)))
             bkg.SetParameters(ff.GetParameter(9), ff.GetParameter(10))
-            ga1.Draw("L SAME")
-            ga2.Draw("L SAME")
-            ga3.Draw("L SAME")
-            bkg.Draw("L SAME")
-            canvas.SetGrid()
-            canvas.Print(out_pdf, f"Title:y ({y_low:g},{y_high:g}), "
-                         f"pt ({pt_low:g},{pt_high:g})")
+            if output_dir is not None:
+                ga1.Draw("L SAME")
+                ga2.Draw("L SAME")
+                ga3.Draw("L SAME")
+                bkg.Draw("L SAME")
+                canvas.SetGrid()
+                canvas.Print(out_pdf, f"Title:y ({y_low:g},{y_high:g}), "
+                             f"pt ({pt_low:g},{pt_high:g})")
             pt_results[(pt_low, pt_high)] = utils.FitResults(
                 utils.get_gaus_parameters(ga1, histo.GetBinWidth(1)),
                 utils.get_gaus_parameters(ga2, histo.GetBinWidth(1)),
@@ -345,7 +341,8 @@ def fit_histograms(histos, output_dir=".", vv=False, **kwargs):
             )
         results[(y_low, y_high)] = pt_results
 
-    canvas.Print(f"{out_pdf}]")  # Close PDF
+    if output_dir is not None:
+        canvas.Print(f"{out_pdf}]")  # Close PDF
     return results
 
 

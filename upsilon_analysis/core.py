@@ -24,71 +24,13 @@ import math
 import ROOT
 from . import utils
 
-__all__ = ["make_argument_parser", "build_dataframe", "book_histograms",
-           "fit_histograms", "build_cross_section_hist",
-           "build_cross_section_graph"]
-
-
-def make_argument_parser():
-    """Prepares an :class:`ArgumentParser` with some analysis arguments.
-
-    :rtype: argparse.ArgumentParser
-
-    Builds an :class`argparse.ArgumentParser` with all the appropriate
-    command-line arguments for the analysis already added; these are:
-
-    *  ``--input-file`` or ``-i``: optional, default input file is a
-       ``root://`` link to CMS Open Data;
-    *  ``--pt-min``: in GeV/c, optional, default 10;
-    *  ``--pt-max``: in GeV/c, optional, default 100;
-    *  ``--pt-bin-width``: in GeV/c, optional, default 2;
-    *  ``--y-min``: in absolute value, optional, default 0;
-    *  ``--y-max``: in absolute value, optional, default 1.2;
-    *  ``--y-bins``: number of y bins, optional, default 2;
-    *  ``--mass-bins``: number of mass bins, optional, default 100 (the
-       range is fixed to 8.5-11.5 GeV/c^2);
-    *  ``--no-quality``: suppress quality cuts;
-    *  ``-v``: verbose mode, can be used for logging setup; default
-       ``False``;
-    *  ``--vv``: very verbose mode, see above; default ``False``.
-    """
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--input-file", "-i", metavar="PATH",
-                        default=("root://eospublic.cern.ch//eos/opendata/cms"
-                                 "/derived-data/AOD2NanoAODOutreachTool"
-                                 "/Run2012BC_DoubleMuParked_Muons.root"),
-                        help=("Input file to be used, optional; the default "
-                              "file is opened from root://eospublic.cern.ch; "
-                              "any URL supported by RDataFrame can be used."))
-    parser.add_argument("--pt-min", type=float, default=10., metavar="MIN",
-                        help="Minimum resonance pt (GeV/c); default 10.")
-    parser.add_argument("--pt-max", type=float, default=100., metavar="MAX",
-                        help="Maximum resonance pt (GeV/c); default 100.")
-    parser.add_argument("--pt-bin-width", type=float, default=2., metavar="W",
-                        help=("Width of the pt bins (GeV/c); above 40 GeV/c "
-                              "bins will be made larger; default 2."))
-    parser.add_argument("--y-min", type=float, default=0., metavar="MIN",
-                        help=("Minimum resonance rapidity (absolute value); "
-                              "default 0."))
-    parser.add_argument("--y-max", type=float, default=1.2, metavar="MAX",
-                        help=("Maximum resonance rapidity (absolute value); "
-                              "default 1.2"))
-    parser.add_argument("--y-bins", type=float, default=2, metavar="N",
-                        help=("Number of resonance rapidity (absolute value) "
-                              "bins; default 2."))
-    parser.add_argument("--mass-bins", type=int, default=100, metavar="N",
-                        help=("Number of invariant mass bins; default 100; "
-                              "histograms with too few events are rebinned."))
-    parser.add_argument("--no-quality", action="store_true",
-                        help="Skip muon quality cuts.")
-    parser.add_argument("-v", action="store_true", help="Verbose mode.")
-    parser.add_argument("--vv", action="store_true", help="Very verbose mode.")
-    return parser
+__all__ = ["build_dataframe", "book_histograms", "fit_histograms",
+           "build_cross_section_hist", "build_cross_section_graph"]
 
 
 @utils.static_variables(c_functions_defined=False)
 def build_dataframe(input_file, no_quality=False, y_min=0, y_max=1.2,
-                    pt_min=10, pt_max=100, **kwargs):
+                    pt_min=10, pt_max=100):
     """Opens the given file in an ``RDataFrame``.
 
     :param input_file: The file from which to take the Events `TTree`.
@@ -103,8 +45,6 @@ def build_dataframe(input_file, no_quality=False, y_min=0, y_max=1.2,
     :type pt_min: float, optional
     :param pt_max: Maximum pt in GeV/c for the dimuon system.
     :type pt_max: float, optional
-    :param \**kwargs: Only used to avoid errors when the result of
-       :any:`make_argument_parser` is given.
     :rtype: ROOT.RDataFrame
 
     Makes a ``ROOT.RDataFrame`` with the given input, applies cuts
@@ -183,7 +123,7 @@ def build_dataframe(input_file, no_quality=False, y_min=0, y_max=1.2,
 
 
 def book_histograms(df, mass_bins=100, y_min=0, y_max=1.2, y_bins=2,
-                    pt_min=10, pt_max=100, pt_bin_width=2, **kwargs):
+                    pt_min=10, pt_max=100, pt_bin_width=2):
     """Pepares mass histograms to be made by the ``RDataFrame``.
 
     :param df: The ``RDataFrame`` to work on.
@@ -203,8 +143,6 @@ def book_histograms(df, mass_bins=100, y_min=0, y_max=1.2, y_bins=2,
     :param pt_bin_width: Width, in GeV/c, of the pt bins (see
        :any:`utils.pt_bin_edges`)
     :type pt_bin_width: float, optional
-    :param \**kwargs: Only used to avoid errors when the result of
-       :any:`make_argument_parser` is given.
     :rtype: :class:`dict[tuple[float, float], dict[tuple[float, float],
        TH1D]]`
 
@@ -250,7 +188,7 @@ def book_histograms(df, mass_bins=100, y_min=0, y_max=1.2, y_bins=2,
     return y_bins
 
 
-def fit_histograms(histos, output_dir=None, vv=False, **kwargs):
+def fit_histograms(histos, output_dir=None, vv=False):
     """Automatic mass histograms fitting.
 
     :param histos: Dictionary of dictionaries of histograms (see below).
@@ -260,8 +198,6 @@ def fit_histograms(histos, output_dir=None, vv=False, **kwargs):
     :type output_dir: str
     :param vv: Very verbose mode.
     :type vv: bool
-    :param \**kwargs: Only used to avoid errors when the result of
-       :any:`make_argument_parser` is given.
     :rtype: :class:`dict[tuple[float, float], dict[tuple[float, float],
        utils.FitResults]]`
 

@@ -14,16 +14,52 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
-"""Module for executing the analysis from the command line."""
+"""Example analysis using the upsilon_analysis package."""
 import logging
+import argparse
 import os
 import ROOT
 from . import *
 from .utils import print_fit_results
 
 
+def args_for(func, kwargs):
+    """Strips ``kwargs`` of the names that func does not require."""
+    return {k: v for k, v in kwargs.items() if k in func.__code__.co_varnames}
+
+
 if __name__ == "__main__":
-    parser = make_argument_parser()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--input-file", "-i", metavar="PATH",
+                        default=("root://eospublic.cern.ch//eos/opendata/cms"
+                                 "/derived-data/AOD2NanoAODOutreachTool"
+                                 "/Run2012BC_DoubleMuParked_Muons.root"),
+                        help=("Input file to be used, optional; the default "
+                              "file is opened from root://eospublic.cern.ch; "
+                              "any URL supported by RDataFrame can be used."))
+    parser.add_argument("--pt-min", type=float, default=10., metavar="MIN",
+                        help="Minimum resonance pt (GeV/c); default 10.")
+    parser.add_argument("--pt-max", type=float, default=100., metavar="MAX",
+                        help="Maximum resonance pt (GeV/c); default 100.")
+    parser.add_argument("--pt-bin-width", type=float, default=2., metavar="W",
+                        help=("Width of the pt bins (GeV/c); above 40 GeV/c "
+                              "bins will be made larger; default 2."))
+    parser.add_argument("--y-min", type=float, default=0., metavar="MIN",
+                        help=("Minimum resonance rapidity (absolute value); "
+                              "default 0."))
+    parser.add_argument("--y-max", type=float, default=1.2, metavar="MAX",
+                        help=("Maximum resonance rapidity (absolute value); "
+                              "default 1.2"))
+    parser.add_argument("--y-bins", type=float, default=2, metavar="N",
+                        help=("Number of resonance rapidity (absolute value) "
+                              "bins; default 2."))
+    parser.add_argument("--mass-bins", type=int, default=100, metavar="N",
+                        help=("Number of invariant mass bins; default 100; "
+                              "histograms with too few events are rebinned."))
+    parser.add_argument("--no-quality", action="store_true",
+                        help="Skip muon quality cuts.")
+    parser.add_argument("-v", action="store_true", help="Verbose mode.")
+    parser.add_argument("--vv", action="store_true", help="Very verbose mode.")
     parser.add_argument("--threads", "-j", type=int, default=0, metavar="N",
                         help=("Number of threads, see ROOT::EnableImplicitMT; "
                               "chosen automatically by ROOT by default; if "
@@ -43,8 +79,8 @@ if __name__ == "__main__":
     if args.threads != 1:
         logging.debug("Enabling MT")
         ROOT.EnableImplicitMT(args.threads)
-    df = build_dataframe(**kwargs)
-    mass_histos = book_histograms(df, **kwargs)
+    df = build_dataframe(**args_for(build_dataframe, kwargs))
+    mass_histos = book_histograms(df, **args_for(book_histograms, kwargs))
     logging.info("Actually running the analysis with the RDataFrame")
     df.Report().Print()  # Here all the booked actions are actually run
 
@@ -52,7 +88,7 @@ if __name__ == "__main__":
     if not os.path.isdir(args.output_dir):
         logging.info("Creating output directory %s", args.output_dir)
         os.mkdir(args.output_dir)
-    fits = fit_histograms(mass_histos, **kwargs)
+    fits = fit_histograms(mass_histos, **args_for(fit_histograms, kwargs))
     # Save fit results to a CSV file, for importing use TTree::ReadFile
     out_csv = os.path.join(args.output_dir, "fit_results.csv")
     logging.info("Saving fit results to %s", out_csv)

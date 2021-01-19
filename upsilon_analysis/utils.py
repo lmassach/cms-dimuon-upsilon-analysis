@@ -19,7 +19,7 @@ from collections import namedtuple
 
 __all__ = ["y_bin_edges", "pt_bin_edges", "bins", "static_variables",
            "GausParameters", "LineParameters", "FitResults",
-           "get_gaus_parameters", "print_fit_results", "Namespace",
+           "get_gaus_parameters", "print_fit_results",
            "sort_bins", "uniques"]
 
 
@@ -224,38 +224,6 @@ def print_fit_results(results, file=None):
             cols = (y_low, y_high, pt_low, pt_high, *res.y1, *res.y2, *res.y3,
                     *res.bkg, res.chi2, res.ndf)
             print(",".join(str(x) for x in cols), file=file)
-
-
-class Namespace:
-    """A class for holding options similar to ``argparse.Namespace``.
-
-    :param \**kwargs: Used to set the object's fields.
-    """
-    def __init__(self, **kwargs):
-        self.update(kwargs)
-
-    def __contains__(self, key):
-        return key in self.__dict__
-
-    def __repr__(self):
-        type_name = type(self).__name__
-        arg_strings = []
-        for name, value in self._get_kwargs():
-            arg_strings.append(f"{name}={value!r}")
-        return f"{type_name}({', '.join(arg_strings)})"
-
-    def _get_kwargs(self):
-        return sorted(self.__dict__.items())
-
-    def update(self, dictionary):
-        """Sets the object's fields to the values given by the dict.
-
-        :param dictionary: A dict with the values to set to the fields.
-        :type dictionary: dict
-        :return: None
-        """
-        for name, value in dictionary.items():
-            setattr(self, name, value)
 
 
 def sort_bins(iterable):

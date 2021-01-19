@@ -28,6 +28,18 @@ def args_for(func, kwargs):
     return {k: v for k, v in kwargs.items() if k in func.__code__.co_varnames}
 
 
+def iter_csv(file_path):
+    """Simple CSV parser."""
+    with open(file_path) as ifs:
+        for ln in ifs:
+            fields = ln.strip().split(",")
+            if len(fields) != 0:
+                try:
+                    yield tuple(float(x.strip()) for x in fields)
+                except ValueError:  # Non-numeric values
+                    pass
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input-file", "-i", metavar="PATH",
@@ -70,6 +82,16 @@ if __name__ == "__main__":
                         help=("Max delta (in GeV) between fitted and known "
                               "resonance mass to consider the fit good; "
                               "default 0.025; known masses are from PDG."))
+    parser.add_argument("--luminosity", type=float, default=1,
+                        help="The integrated luminosity of the sample.")
+    parser.add_argument("--luminosity-units", default=None,
+                        help="The int. lumi. units for the plots' labels.")
+    parser.add_argument("--efficiency-table", default=None,
+                        help=("A CSV file with the efficiency per bin, whose "
+                              "columns are y_min, y_max, pt_min, pt_max, "
+                              "eff_y1, eff_y2, eff_y3. If you have a global "
+                              "efficiency for all bins, multiply luminosity "
+                              "by it."))
     args = parser.parse_args()
     kwargs = vars(args)
     logging.basicConfig(level=(logging.DEBUG if args.vv else
@@ -120,13 +142,28 @@ if __name__ == "__main__":
             logging.warning("Not enough pt bins for xsec plots (%g<y<%g)",
                             y_low, y_high)
             continue
+        if args.efficiency_table is None:
+            eff = [1, 1, 1]
+        else:
+            eff = [{}, {}, {}]
+            for ln in iter_csv(args.efficiency_table):
+                print(repr(ln[0]), repr(y_low))
+                print(repr(ln[1]), repr(y_high))
+                if ln[0] == y_low and ln[1] == y_high:
+                    eff[0][(ln[2], ln[3])] = ln[4]
+                    eff[1][(ln[2], ln[3])] = ln[5]
+                    eff[2][(ln[2], ln[3])] = ln[6]
         # Graphs for the three Ys' cross sections
         graphs = [
-            build_cross_section_graph({k: v[n] for k, v in ok_bins.items()})
+            build_cross_section_graph({k: v[n] for k, v in ok_bins.items()},
+                                      args.luminosity, eff[n])
             for n in range(3)
         ]
         for n, graph in enumerate(graphs):
             graph.SetTitle(f"#Upsilon({n+1}s), |y| #in [{y_low:g},{y_high:g})")
+            if args.luminosity_units is not None:
+                graph.GetYaxis().SetTitle("d#sigma/dp_{T}#times#it{Br} "
+                                          f"[{args.luminosity_units}/GeV]")
             graph.SetLineWidth(2)
             graph.Draw("APZ")
             canvas.SetGrid()

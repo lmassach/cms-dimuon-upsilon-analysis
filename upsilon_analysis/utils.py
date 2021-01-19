@@ -35,7 +35,7 @@ def y_bin_edges(y_min, y_max, n_bins):
     :rtype: float
 
     Guarantees that ``y_min`` is the first item yielded and ``y_max`` is
-    the last.
+    the last, without roundoff errors.
     """
     bin_width = (y_max - y_min) / n_bins
     for i in range(n_bins):
@@ -92,8 +92,8 @@ def bins(edges):
     :rtype: :class:`tuple[float, float]`
 
     Actually ``edges`` can also be an iterable that does not support
-    slicing, so it is a more general implementation (altough probably
-    less efficient).
+    slicing, so it is a more general implementation than that with
+    ``zip`` (altough probably less efficient).
     """
     last = None
     for item in edges:
@@ -196,19 +196,21 @@ def get_gaus_parameters(ga, bin_width, hist_range=(8.5, 11.5)):
     integral of the gaussian will be equal to the integral of the
     histogram, which is the total number of entries times the bin width.
 
-    Note that this also works if the fit option "I" (using the integral
-    of the function in the bin rather than its value at the center) is
-    used, since ROOT normalizes histogram integrals to the bin width.
+    Note that this also works if the fit option ``I`` (using the
+    integral of the function in the bin rather than its value at the
+    center) is used, since ROOT normalizes histogram integrals to the
+    bin width.
 
-    Do not forget to provide the range if the default ``hist_range`` is
-    not correct.
+    .. warning::
+       Do not forget to provide the range if the default ``hist_range`` is
+       not correct.
     """
     p0 = ga.Integral(*hist_range) / bin_width
     return GausParameters(p0, ga.GetParameter(1), ga.GetParameter(2))
 
 
 def print_fit_results(results, file=None):
-    """Print fit results in CSV format to ``file`` (default stdout).
+    """Print fit results in CSV format to ``file`` (default ``stdout``).
 
     :param results: A dictionary like that returned by
        :any:`core.fit_histograms`
@@ -256,14 +258,21 @@ def sort_bins(iterable):
 
 
 def uniques(iterable):
-    """Yields only uniques values out of a **sorted** iterable.
+    """Yields only uniques values out of a *sorted* iterable.
 
-    :param iterable: A **sorted** iterable of objects that support the
+    :param iterable: A *sorted* iterable of objects that support the
        ``!=`` operator.
 
     Loops over ``iterable`` (which is assumed to be sorted) and yields
     its items only if they are unique (i.e. different from the previous,
     since they are sorted).
+
+    .. warning::
+       This function is a very simple and fast implementation for the
+       specific case of sorted iterables.
+
+       If ``iterable`` is not sorted, the same item may be yielded
+       multiple times.
     """
     prev = None
     for item in iterable:

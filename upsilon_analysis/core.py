@@ -21,6 +21,7 @@ import logging
 import array
 import itertools
 import math
+import collections.abc
 import ROOT
 from . import utils
 
@@ -62,15 +63,24 @@ def build_dataframe(input_file, no_quality=False, y_min=0, y_max=1.2,
     In the process, the columns ``dimuon_mass``, ``dimuon_pt`` and
     ``dimuon_y`` are created and populated.
 
-    This function uses ``ROOT.gInterpreter.Declare`` to define some
-    global C++ functions, namely:
+    .. warning::
+       This function uses ``ROOT.gInterpreter.Declare`` to define some
+       global C++ functions, namely:
 
-    *  ``float m12(RVec<float>, RVec<float>, RVec<float>, RVec<float>)``
-    *  ``float pt12(RVec<float>, RVec<float>, RVec<float>, RVec<float>)``
-    *  ``float y12(RVec<float>, RVec<float>, RVec<float>, RVec<float>)``
+       *  ``float m12(RVec<float>, RVec<float>, RVec<float>,
+          RVec<float>)``
+       *  ``float pt12(RVec<float>, RVec<float>, RVec<float>,
+          RVec<float>)``
+       *  ``float y12(RVec<float>, RVec<float>, RVec<float>,
+          RVec<float>)``
 
-    If the function is run more than once, the C++ functions are *not*
-    redefined.
+       If you define something with this names in the global namespace
+       an error will arise, but ``ROOT`` may actually not raise any
+       exception in Python.
+
+       If the function is run more than once, the C++ functions are
+       *not* redefined, so multiple calls to this function will work
+       without issues.
     """
     # C++ functions to compute the invariant mass, the transverse
     # momentum and the rapidity of the dimuon system
@@ -282,11 +292,22 @@ def fit_histograms(histos, output_dir=None, vv=False):
     return results
 
 
-def build_cross_section_hist(fit_results):
+def build_cross_section_hist(fit_results, luminosity=1, efficiency=1):
     """Builds a dσ/dpt vs pt histogram from a collection of fit results.
 
     :param fit_results: Dictionary of the occurrences in each bin.
     :type fit_results: :class:`dict[tuple[float, float], int]`
+    :param luminosity: The total integrated luminosity for calculating
+       real cross sections (the units must be added manually to the axis
+       label).
+    :type luminosity: float, optional
+    :param efficiency: The detection for calculating real cross
+       sections. If a scalar is given, it will be used for all bins;
+       otherwise it must be a :class:`dict` like ``fit_results`` with an
+       efficiency value for each bin.
+    :type efficiency: :class:`float` or :class:`dict[tuple[float,
+       float], float]`, optional
+    :raises RuntimeError: If the bins are invalid or overlap.
     :rtype: ROOT.TH1F
 
     The argument ``fit_results`` should be a dictionary whose keys are
@@ -300,16 +321,26 @@ def build_cross_section_hist(fit_results):
     The results will be a ``TH1F`` whose bins are given by the keys of
     ``fit_results``, and whose bins' contents are the respective numbers
     of occurrences divided by the bin width. This will be proportional
-    to dσ/dpt: to get the real value one needs to ``TH1F::Scale`` the
-    histogram by ``1 / int_luminosity / efficiency / acceptance``.
+    to dσ/dpt.
+
+    If ``luminosity`` and/or ``efficiency`` are given, each bin will be
+    divided by them. This way one can get a real cross section measure.
+    Remember to change the y axis label to include the correct units.
 
     If the given bins overlap, a ``RuntimeError`` will be raised.
 
-    If the bins are non-contiguos (i.e. there is a "hole"), a bin with
-    zero content will be made (this is important if you intend to fit
-    the histogram).
+    .. note::
+       If the bins are non-contiguos (i.e. there is a "hole"), a bin
+       with zero content will be made (this is important if you intend
+       to fit the histogram).
+
+    .. note::
+        The acceptance may, and should, be included in the efficiency.
     """
     fit_bins = utils.sort_bins(fit_results.keys())
+    if not isinstance(efficiency, collections.abc.Mapping):
+        # If not a dict, it is a scalar: we build the dict here
+        efficiency = {k: efficiency for k in fit_results.keys()}
     # TH1 requires contiguos bins
     fit_bins_edges = utils.uniques(itertools.chain.from_iterable(fit_bins))
     hist_bins = list(utils.bins(fit_bins_edges))
@@ -321,16 +352,28 @@ def build_cross_section_hist(fit_results):
     for bin, n in fit_results.items():
         bin_idx = hist_bins.index(bin) + 1
         delta_pt = bin[1] - bin[0]
-        hist.SetBinContent(bin_idx, n / delta_pt)
-        hist.SetBinError(bin_idx, math.sqrt(n) / delta_pt)
+        den = delta_pt * luminosity * efficiency[bin]
+        hist.SetBinContent(bin_idx, n / den)
+        hist.SetBinError(bin_idx, math.sqrt(n) / den)
     return hist
 
 
-def build_cross_section_graph(fit_results):
+def build_cross_section_graph(fit_results, luminosity=1, efficiency=1):
     """Builds a dσ/dpt vs pt graph from a collection of fit results.
 
     :param fit_results: Dictionary of the occurrences in each bin.
     :type fit_results: :class:`dict[tuple[float, float], int]`
+    :param luminosity: The total integrated luminosity for calculating
+       real cross sections (the units must be added manually to the axis
+       label).
+    :type luminosity: float, optional
+    :param efficiency: The detection for calculating real cross
+       sections. If a scalar is given, it will be used for all bins;
+       otherwise it must be a :class:`dict` like ``fit_results`` with an
+       efficiency value for each bin.
+    :type efficiency: :class:`float` or :class:`dict[tuple[float,
+       float], float]`, optional
+    :raises RuntimeError: If the bins are invalid or overlap.
     :rtype: ROOT.TGraphErrors
 
     The argument ``fit_results`` should be a dictionary whose keys are
@@ -346,20 +389,30 @@ def build_cross_section_graph(fit_results):
     the pt bins' width, the y values are the numbers of occurrences
     divided by the pt bin width and the y error is estimated as the
     square root of the number of occurrences divided by the pt bin
-    width. This way the y values will be proportional to dσ/dpt: to get
-    the real value one needs to scale the graph (with a custom function)
-    by ``1 / int_luminosity / efficiency / acceptance``.
+    width. This way the y values will be proportional to dσ/dpt.
+
+    If ``luminosity`` and/or ``efficiency`` are given, each y value will
+    be divided by them. This way one can get a real cross section
+    measure. Remember to change the y axis label to include the correct
+    units.
 
     If the given bins overlap, a ``RuntimeError`` will be raised.
+
+    .. note::
+        The acceptance may, and should, be included in the efficiency.
     """
     fit_bins = utils.sort_bins(fit_results.keys())
+    if not isinstance(efficiency, collections.abc.Mapping):
+        # If not a dict, it is a scalar: we build the dict here
+        efficiency = {k: efficiency for k in fit_results.keys()}
     graph = ROOT.TGraphErrors(
         len(fit_bins),
         array.array('d', ((b[0] + b[1]) / 2 for b in fit_bins)),
-        array.array('d', (fit_results[b] / (b[1] - b[0]) for b in fit_bins)),
+        array.array('d', (fit_results[b] / (b[1] - b[0]) / luminosity
+                          / efficiency[b] for b in fit_bins)),
         array.array('d', ((b[1] - b[0]) / 2 for b in fit_bins)),
         array.array('d', (math.sqrt(fit_results[b]) / (b[1] - b[0])
-                          for b in fit_bins))
+                          / luminosity / efficiency[b] for b in fit_bins))
     )
     graph.SetTitle("Cross section;p_{T} [GeV/c];"
                    "d#sigma/dp_{T}#times#it{Br} [arb. un.]")

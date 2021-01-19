@@ -154,7 +154,7 @@ class LineParameters(namedtuple("LineParameters", "q m")):
     """
 
 
-class FitResults(namedtuple("FitResults", "y1 y2 y3 bkg chi2 ndf")):
+class FitResults(namedtuple("FitResults", "y1 y2 y3 bkg chi2 ndf nevt")):
     """A named tuple for the results of the global fit.
 
     :ivar y1: First resonance.
@@ -169,6 +169,8 @@ class FitResults(namedtuple("FitResults", "y1 y2 y3 bkg chi2 ndf")):
     :vartype chi2: float
     :ivar ndf: Number of degrees of freedom of the fit.
     :vartype ndf: float
+    :ivar nevt: Total number of events in the fitted histogram.
+    :vartype nevt: int
     """
 
 

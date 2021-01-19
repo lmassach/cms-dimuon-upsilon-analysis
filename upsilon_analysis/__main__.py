@@ -132,7 +132,9 @@ if __name__ == "__main__":
         # Cut the bin with all the data and those with bad fits
         del pt_bins[(args.pt_min, args.pt_max)]
         ok_bins = {k: (v.y1.a, v.y2.a, v.y3.a) for k, v in pt_bins.items()
-                   if abs(v.y1.m - 9.4603) <= args.max_mass_delta
+                   if v.y1.a >= 0 and v.y2.a >= 0 and v.y3.a >= 0
+                   and v.y1.a + v.y2.a + v.y3.a < v.nevt
+                   and abs(v.y1.m - 9.4603) <= args.max_mass_delta
                    and abs(v.y2.m - 10.0232) <= args.max_mass_delta
                    and abs(v.y3.m - 10.3552) <= args.max_mass_delta}
         logging.debug("Discarded %d bins due to wrong fitted mass(es) "
@@ -147,8 +149,6 @@ if __name__ == "__main__":
         else:
             eff = [{}, {}, {}]
             for ln in iter_csv(args.efficiency_table):
-                print(repr(ln[0]), repr(y_low))
-                print(repr(ln[1]), repr(y_high))
                 if ln[0] == y_low and ln[1] == y_high:
                     eff[0][(ln[2], ln[3])] = ln[4]
                     eff[1][(ln[2], ln[3])] = ln[5]
@@ -172,5 +172,5 @@ if __name__ == "__main__":
     canvas.Print(f"{out_pdf}]")  # Close PDF
 
     del canvas
-    # TODO use acceptance tables from article, adding a command-line
-    # argument for loading that table from a csv
+    # TODO check the article for other efficiency factors
+    #  - efficiency ~ 0.5 * (0.75-0.80)

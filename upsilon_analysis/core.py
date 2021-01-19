@@ -283,7 +283,7 @@ def fit_histograms(histos, output_dir=None, vv=False):
                 utils.get_gaus_parameters(ga2, histo.GetBinWidth(1)),
                 utils.get_gaus_parameters(ga3, histo.GetBinWidth(1)),
                 utils.LineParameters(bkg.GetParameter(0), bkg.GetParameter(1)),
-                ff.GetChisquare(), ff.GetNDF()
+                ff.GetChisquare(), ff.GetNDF(), histo.GetEntries()
             )
         results[(y_low, y_high)] = pt_results
 

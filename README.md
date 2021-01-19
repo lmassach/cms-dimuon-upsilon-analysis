@@ -81,9 +81,34 @@ is discarded (for all the resonances, as it might alter the background
 estimate). The command-line argument `--max-mass-delta` can be used to control
 this behavior (see command help for default value).
 
+Also a consistency check is performed: the fitted number of resonance events
+must be non-negative for the three resonances, and the sum must be less than
+the number of events. This helps excluding bad fits.
+
 The graphs are plotted and saved to `cross_section_plots.pdf`.
 
 Note: this part of the analysis is in the `__main__.py`.
+
+### Efficiency
+While the integrated luminosity is a constant, the efficiency/acceptance may
+depend on pt. To take this into account, the command-line argument
+`--efficiency-table` is provided, which allows to specify a CSV file with the
+following columns:
+ - `y_min` and `y_max`: the limits of the y bin in which the efficiency is
+   computed;
+ - `pt_min` and `pt_max`: the limits of the pt bin in which the efficiency is
+   computed;
+ - `eff_y1`, `eff_y2` and `eff_y3`: the computed efficiencies for muon pairs
+   with the resonances' invariant mass.
+
+The bins in the CSV must, of course, match those of the fits. Roundoff errors
+might need to be taken into account as the bins are matched by the `==`
+operator.
+
+If this infomation is provided, the dσ/dpt in each bin is divided by the
+efficiency given for that bin, thus allowing to compute an unbiased estimate of
+the dσ/dpt vs pt function, or the real dσ/dpt vs pt if luminosity is also
+provided via the `--luminosity` command line argument.
 
 ## Testing
 The easiest way to run the tests is to use

@@ -172,5 +172,3 @@ if __name__ == "__main__":
     canvas.Print(f"{out_pdf}]")  # Close PDF
 
     del canvas
-    # TODO check the article for other efficiency factors
-    #  - efficiency ~ 0.5 * (0.75-0.80)

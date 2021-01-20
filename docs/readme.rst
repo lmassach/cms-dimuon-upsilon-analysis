@@ -7,4 +7,4 @@ Readme & Quickstart
    are stripped away.
 
 .. mdinclude:: ../README.md
-   :start-line: 4
+   :start-line: 5

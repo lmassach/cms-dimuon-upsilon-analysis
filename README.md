@@ -1,6 +1,7 @@
 # cms-dimuon-upsilon-analysis
 [![Documentation Status](https://readthedocs.org/projects/cms-dimuon-upsilon-analysis/badge/?version=latest)](https://cms-dimuon-upsilon-analysis.readthedocs.io/en/latest/?badge=latest)
-<!--- This line is left for CI badge, just in case running ROOT proves feasible with some engine. Note that docs/readme.rst includes this markdown file from the fourth line on, so the title and the badges (and also this comment) are conveniently excluded. -->
+[![Build Status](https://travis-ci.com/lmassach/cms-dimuon-upsilon-analysis.svg?branch=main)](https://travis-ci.com/lmassach/cms-dimuon-upsilon-analysis)
+<!--- Note: docs/readme.rst includes this markdown file from the fifht line on, so the title and the badges (and also this comment) are conveniently excluded. -->
 
 Analysis of the di-muon events from CMS open data aimed at resolving and
 fitting the upsilon resonances' masses as a function of their transverse
@@ -23,13 +24,13 @@ python3 -m upsilon_analysis --help
 ## Event selection
 The events in the dataset are selected by applying the following cuts:
  - the event must have exactly two opposite-charge muons;
- - each muon must must pass the quality cuts:
+ - each muon must must pass the quality cuts (can be skipped):
     - eta must be less than 1.6, pt more than 3 GeV;
     - if eta is less than 1.4, pt must be more than 3.5 GeV;
     - if eta is less than 1.2, pt must be more than 4.5 GeV;
  - the invariant mass of the dimuon system must be between 8.5 and 11.5 GeV;
- - the rapidity of the dimuon system must be less than 1.2;
- - the pt of the dimuon system must be between 10 and 100 GeV;
+ - the rapidity of the dimuon system must be less than 1.2 (configurable);
+ - the pt of the dimuon system must be between 10 and 100 GeV (configurable);
 
 ## Binning
 The selected events are binned by the resonance's rapidity y; y limits and
@@ -48,7 +49,8 @@ histogram of the invariant mass distribution is made (number of bins can be
 set via command-line arguments; range is fixed to 8.5-11.5 GeV). This
 distribution is fitted with the sum of three gaussians (for the resonances)
 plus a 1st order polynomial (for the background). The number of occurrences of
-each resonance is computed from the gaussians' parameters.
+each resonance is computed from the gaussians' parameters (see
+`get_gaus_parameters()`).
 
 Since the pole masses of the upsilon resonances are known, their fitted masses
 can be used as goodness-of-fit statistics besides chi-squared / degrees of
@@ -65,6 +67,9 @@ fitResults.ReadFile("fit_results.csv");
 ROOT will deduce the column names from the first line, all columns will be
 floats (which is the intended result).
 
+If you use the API yourself, saving the PDF is optional, and saving the CSV has
+to be done manually (see `print_fit_results()`).
+
 ## Differential cross sections
 For each y bin the differential cross section dσ/dpt (times the branching ratio
 to μμ) is computed from the fitted numbers of occurrences of each resonance. A
@@ -73,7 +78,10 @@ occurrences in each bin is divided by the width of the bin; this quantity is
 proportional to dσ/dpt, and the real value can be obtained dividing by the
 integrated luminosity times the efficiency time the acceptance.
 
-In this analysis the dependence of efficiency/acceptance on pt is neglected.
+The functions `build_cross_section_hist()` and `build_cross_section_graph()`
+actually allow to specify the integrated luminosity and the
+efficiency/acceptance (the latter either globally or per y-pt bin), and there
+are command-line arguments for exploting this feature (see below).
 
 Not all the fitted values are used: if the fitted mass of a resonance is
 different from the known mass (from PDG) by more than a certain delta the fit
@@ -87,7 +95,8 @@ the number of events. This helps excluding bad fits.
 
 The graphs are plotted and saved to `cross_section_plots.pdf`.
 
-Note: this part of the analysis is in the `__main__.py`.
+Note: this part of the analysis is implemented in the `__main__.py`, so it is
+not a part of the API (but can be used as example).
 
 ### Efficiency
 While the integrated luminosity is a constant, the efficiency/acceptance may
@@ -107,7 +116,7 @@ operator.
 
 If this infomation is provided, the dσ/dpt in each bin is divided by the
 efficiency given for that bin, thus allowing to compute an unbiased estimate of
-the dσ/dpt vs pt function, or the real dσ/dpt vs pt if luminosity is also
+the dσ/dpt vs pt function, or the real dσ/dpt vs pt if the luminosity is also
 provided via the `--luminosity` command line argument.
 
 ## Testing
@@ -119,3 +128,5 @@ python3 -m tests
 For testing some of the core functions (`build_dataframe`, `book_histograms`) a
 small dataset (47 KiB) is used. It is in the tests folder, and consists of the
 first 1000 events of [this one](http://opendata.web.cern.ch/record/12341).
+
+Also `pytest` is supported.

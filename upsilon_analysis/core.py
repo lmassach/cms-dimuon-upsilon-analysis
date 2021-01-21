@@ -133,7 +133,8 @@ def build_dataframe(input_file, no_quality=False, y_min=0, y_max=1.2,
 
 
 def book_histograms(df, mass_bins=100, y_min=0, y_max=1.2, y_bins=2,
-                    pt_min=10, pt_max=100, pt_bin_width=2):
+                    pt_min=10, pt_max=100, pt_bin_width=2, y_bins_list=None,
+                    pt_bins_list=None):
     """Pepares mass histograms to be made by the ``RDataFrame``.
 
     :param df: The ``RDataFrame`` to work on.
@@ -151,8 +152,15 @@ def book_histograms(df, mass_bins=100, y_min=0, y_max=1.2, y_bins=2,
     :param pt_max: Maximum, in GeV/c, for pt binning.
     :type pt_max: float, optional
     :param pt_bin_width: Width, in GeV/c, of the pt bins (see
-       :any:`utils.pt_bin_edges`)
+       :any:`utils.pt_bin_edges`).
     :type pt_bin_width: float, optional
+    :param y_bins_list: If provided, ``y_min``, ``y_max`` and ``y_bins``
+       are ignored and the tuples in this iterable are used as bins.
+    :type y_bins_list: :class:`Iterable[tuple[float, float]]`
+    :param pt_bins_list: If provided, ``pt_min``, ``pt_max`` and
+       ``pt_bin_width`` are ignored and the tuples in this iterable are
+       used as bins.
+    :type pt_bins_list: :class:`Iterable[tuple[float, float]]`
     :rtype: :class:`dict[tuple[float, float], dict[tuple[float, float],
        TH1D]]`
 
@@ -182,13 +190,20 @@ def book_histograms(df, mass_bins=100, y_min=0, y_max=1.2, y_bins=2,
                    "m_{#mu#mu};m_{#mu#mu} [GeV/c^{2}];Occurrences / bin",
                    mass_bins, 8.5, 11.5)
     edges = utils.y_bin_edges(y_min, y_max, y_bins)
-    y_bins = {bin: {} for bin in utils.bins(edges)}
-    y_bins[(y_min, y_max)] = {}  # Bin with all rapidities
+    if y_bins_list is None:
+        y_bins = {bin: {} for bin in utils.bins(edges)}
+        y_bins[(y_min, y_max)] = {}  # Bin with all rapidities
+    else:
+        y_bins = list(y_bins_list)
     for (y_low, y_high), pt_bins in y_bins.items():
         y_filtered = df.Filter(
             f"{y_low}<=abs(dimuon_y)&&abs(dimuon_y)<{y_high}")
-        edges = utils.pt_bin_edges(pt_min, pt_max, pt_bin_width)
-        for pt_low, pt_high in utils.bins(edges):
+        if pt_bins_list is None:
+            edges = utils.pt_bin_edges(pt_min, pt_max, pt_bin_width)
+            bins = list(utils.bins(edges))
+        else:
+            bins = list(pt_bins_list)
+        for pt_low, pt_high in bins:
             pt_filtered = y_filtered.Filter(
                 f"{pt_low}<dimuon_pt&&dimuon_pt<{pt_high}")
             pt_bins[(pt_low, pt_high)] = pt_filtered.Histo1D(
